@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #F6F8F5;
+  --surface: #FFFFFF;
+  --surface-soft: #EFF4F0;
+  --ink: #12261F;
+  --ink-soft: #4C5F57;
+  --line: #DCE6E1;
+  --primary: #0B6E4F;
+  --primary-strong: #084A35;
+  --primary-soft: #E4F1EB;
+  --accent: #FF7A45;
+  --accent-soft: #FFE7DA;
+  --danger: #D6432F;
+  --warning: #C98A1A;
+}
+
+.dark {
+  --bg: #0B1613;
+  --surface: #10201B;
+  --surface-soft: #142822;
+  --ink: #EAF3EF;
+  --ink-soft: #9FB6AC;
+  --line: #1E332C;
+  --primary: #34D399;
+  --primary-strong: #6EE7B7;
+  --primary-soft: #143028;
+  --accent: #FF9166;
+  --accent-soft: #2A1B15;
+  --danger: #F1685A;
+  --warning: #E0A83E;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-card: 1.1rem;
+  --radius-pill: 999px;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Perforated "label ticket" edge — the storefront's signature motif,
+   used on product cards and receipt-style summaries. */
+.label-notch {
+  position: relative;
+}
+.label-notch::before,
+.label-notch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--bg);
+  border-radius: 999px;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.label-notch::before {
+  left: -8px;
+}
+.label-notch::after {
+  right: -8px;
+}
+
+.label-perforation {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--line) 0,
+    var(--line) 6px,
+    transparent 6px,
+    transparent 13px
+  );
+  height: 1px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

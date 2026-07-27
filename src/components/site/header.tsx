@@ -1,0 +1,235 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import {
+  Search,
+  ShoppingBag,
+  User,
+  Menu,
+  X,
+  Moon,
+  Sun,
+  LayoutDashboard,
+  Package,
+  LogOut,
+  ChevronDown,
+} from "lucide-react";
+import { useCart, cartCount } from "@/store/cart";
+import { useTheme } from "@/components/providers/theme-provider";
+import { cn } from "@/lib/utils";
+
+const NAV_LINKS = [
+  { label: "Medicines", href: "/shop?category=medicines" },
+  { label: "Supplements", href: "/shop?category=supplements" },
+  { label: "Face Wash", href: "/shop?category=face-wash" },
+  { label: "Serums", href: "/shop?category=serums" },
+  { label: "Cosmetics", href: "/shop?category=cosmetics" },
+];
+
+export function Header() {
+  const { data: session } = useSession();
+  const { theme, toggle } = useTheme();
+  const lines = useCart((s) => s.lines);
+  const openCart = useCart((s) => s.open);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+  const router = useRouter();
+  const accountRef = useRef<HTMLDivElement>(null);
+  const count = cartCount(lines);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    router.push(`/shop${query ? `?q=${encodeURIComponent(query)}` : ""}`);
+    setMobileOpen(false);
+  }
+
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md transition-shadow",
+        scrolled && "shadow-[0_1px_0_0_var(--line)]"
+      )}
+    >
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <button
+          className="-ml-2 rounded-lg p-2 text-ink lg:hidden"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white font-display text-lg">
+            +
+          </span>
+          <span className="font-display text-xl tracking-tight text-ink">
+            Medi<span className="text-primary">Store</span>
+          </span>
+        </Link>
+
+        <nav className="hidden items-center gap-1 lg:flex">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-full px-3.5 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-soft hover:text-ink"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <form
+          onSubmit={handleSearch}
+          className="ml-auto hidden max-w-sm flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 md:flex"
+        >
+          <Search size={16} className="text-ink-soft" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search medicines, serums, vitamins..."
+            className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft/60"
+          />
+        </form>
+
+        <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <button
+            onClick={toggle}
+            className="rounded-full p-2.5 text-ink-soft transition hover:bg-surface-soft hover:text-ink"
+            aria-label="Toggle theme"
+          >
+            {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
+
+          <button
+            onClick={openCart}
+            className="relative rounded-full p-2.5 text-ink-soft transition hover:bg-surface-soft hover:text-ink"
+            aria-label="Open cart"
+          >
+            <ShoppingBag size={19} />
+            {count > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
+                {count}
+              </span>
+            )}
+          </button>
+
+          <div className="relative" ref={accountRef}>
+            <button
+              onClick={() => setAccountOpen((v) => !v)}
+              className="flex items-center gap-1 rounded-full p-2 pl-2.5 text-ink-soft transition hover:bg-surface-soft hover:text-ink"
+              aria-label="Account menu"
+            >
+              <User size={19} />
+              <ChevronDown size={14} className="hidden sm:block" />
+            </button>
+
+            {accountOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-surface py-1.5 shadow-lg shadow-black/5">
+                {session?.user ? (
+                  <>
+                    <div className="border-b border-line px-4 py-3">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {session.user.name}
+                      </p>
+                      <p className="truncate text-xs text-ink-soft">
+                        {session.user.email}
+                      </p>
+                    </div>
+                    <Link
+                      href="/account"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-ink hover:bg-surface-soft"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      <Package size={16} /> My orders
+                    </Link>
+                    {session.user.role === "admin" && (
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-ink hover:bg-surface-soft"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        <LayoutDashboard size={16} /> Admin dashboard
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/" })}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-danger hover:bg-surface-soft"
+                    >
+                      <LogOut size={16} /> Sign out
+                    </button>
+                  </>
+                ) : (
+                  <div className="p-2">
+                    <Link
+                      href="/login"
+                      className="block rounded-xl px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-soft"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Sign in
+                    </Link>
+                    <Link
+                      href="/signup"
+                      className="block rounded-xl px-3 py-2.5 text-sm font-medium text-primary hover:bg-surface-soft"
+                      onClick={() => setAccountOpen(false)}
+                    >
+                      Create account
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <div className="border-t border-line bg-bg px-4 pb-4 pt-2 lg:hidden">
+          <form onSubmit={handleSearch} className="mb-3 flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5">
+            <Search size={16} className="text-ink-soft" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products..."
+              className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft/60"
+            />
+          </form>
+          <nav className="flex flex-col gap-1">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-xl px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-soft"
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+}
