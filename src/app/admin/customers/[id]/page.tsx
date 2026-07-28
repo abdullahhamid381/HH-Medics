@@ -14,11 +14,11 @@ export default async function AdminCustomerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const detail = getCustomerDetail(id);
+  const detail = await getCustomerDetail(id);
   if (!detail || detail.user.role !== "customer") notFound();
 
-  const orders = listOrdersForUser(id);
-  const returns = listReturnsForUser(id);
+  const orders = await listOrdersForUser(id);
+  const returns = await listReturnsForUser(id);
 
   return (
     <div>

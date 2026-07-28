@@ -14,10 +14,10 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const related = getRelatedProducts(product, 4);
+  const related = await getRelatedProducts(product, 4);
   const onSale =
     product.compare_at_price && product.compare_at_price > product.price;
   const images: string[] = product.images ? JSON.parse(product.images) : [];

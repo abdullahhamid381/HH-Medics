@@ -43,11 +43,11 @@ export default async function AdminReportsPage({
   const { from, to } = await searchParams;
   const { start, end } = resolveRange(from, to);
 
-  const report = getSalesReport({ start, end });
-  const series = getSalesSeries(start, end);
-  const categories = getCategoryBreakdown({ start, end });
-  const topProducts = getTopProducts(8, { start, end });
-  const statusBreakdown = getOrderStatusBreakdown({ start, end });
+  const report = await getSalesReport({ start, end });
+  const series = await getSalesSeries(start, end);
+  const categories = await getCategoryBreakdown({ start, end });
+  const topProducts = await getTopProducts(8, { start, end });
+  const statusBreakdown = await getOrderStatusBreakdown({ start, end });
 
   const csvRows = series.map((d) => ({
     date: d.day,

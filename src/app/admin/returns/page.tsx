@@ -27,7 +27,7 @@ export default async function AdminReturnsPage({
 }) {
   const { status } = await searchParams;
   const activeStatus = (status as ReturnStatus | "all") ?? "all";
-  const { items, total } = listReturns(activeStatus, 50, 0);
+  const { items, total } = await listReturns(activeStatus, 50, 0);
 
   return (
     <div>

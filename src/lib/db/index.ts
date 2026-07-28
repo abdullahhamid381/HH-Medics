@@ -1,48 +1,29 @@
-import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
-import fs from "node:fs";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Single shared SQLite connection (file-backed) for the whole app.
-// Uses Node's built-in `node:sqlite` module — no native build step required.
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "store.db");
+// Single shared Supabase connection for the whole app, server-side only.
+// Uses the service_role key, which bypasses Row Level Security — every
+// request is already authorized in app code (requireAdmin(), session
+// ownership checks), matching how the app worked against local SQLite.
 
 declare global {
   // eslint-disable-next-line no-var
-  var __medistoreDb__: DatabaseSync | undefined;
+  var __medistoreDb__: SupabaseClient | undefined;
 }
 
-function toPlainObject<T>(row: T): T {
-  if (row === null || typeof row !== "object") return row;
-  return { ...(row as object) } as T;
-}
-
-function wrapDatabase(database: DatabaseSync): DatabaseSync {
-  const rawPrepare = database.prepare.bind(database);
-  database.prepare = (sql: string) => {
-    const stmt = rawPrepare(sql);
-    const rawGet = stmt.get.bind(stmt);
-    const rawAll = stmt.all.bind(stmt);
-    stmt.get = (...params: unknown[]) => toPlainObject(rawGet(...params));
-    stmt.all = (...params: unknown[]) =>
-      (rawAll(...params) as unknown[]).map(toPlainObject);
-    return stmt;
-  };
-  return database;
-}
-
-function createConnection(): DatabaseSync {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function createConnection(): SupabaseClient {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_API_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Missing SUPABASE_URL or SUPABASE_API_KEY. Set them in .env.local (see .env.example)."
+    );
   }
-  const database = new DatabaseSync(DB_PATH);
-  database.exec("PRAGMA journal_mode = WAL;");
-  database.exec("PRAGMA foreign_keys = ON;");
-  return wrapDatabase(database);
+  return createClient(url, key, {
+    auth: { persistSession: false },
+  });
 }
 
-export const db: DatabaseSync = globalThis.__medistoreDb__ ?? createConnection();
+export const db: SupabaseClient = globalThis.__medistoreDb__ ?? createConnection();
 
 if (process.env.NODE_ENV !== "production") {
   globalThis.__medistoreDb__ = db;
@@ -50,4 +31,12 @@ if (process.env.NODE_ENV !== "production") {
 
 export function genId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// Throws if a Supabase response carries an error, otherwise returns data.
+// Every db/*.ts function funnels its query result through this so failures
+// surface immediately instead of silently returning null/undefined.
+export function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
+  if (result.error) throw new Error(result.error.message);
+  return result.data as T;
 }

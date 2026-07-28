@@ -11,11 +11,11 @@ export default async function AdminOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = getOrderById(id);
+  const order = await getOrderById(id);
   if (!order) notFound();
 
   // Server-only: cost_price must never be forwarded to a client component.
-  const itemsWithCost = getOrderItemsWithCost(order.id);
+  const itemsWithCost = await getOrderItemsWithCost(order.id);
   const cogs = itemsWithCost.reduce(
     (sum, item) => sum + (item.cost_price ?? 0) * item.quantity,
     0

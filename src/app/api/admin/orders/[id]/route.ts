@@ -32,7 +32,7 @@ export async function PATCH(
     );
   }
 
-  const order = updateOrderFulfillment(id, {
+  const order = await updateOrderFulfillment(id, {
     status: parsed.data.status,
     trackingNumber: parsed.data.tracking_number,
     carrier: parsed.data.carrier,

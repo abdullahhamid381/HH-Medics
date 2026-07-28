@@ -18,7 +18,7 @@ export function formatDate(iso: string): string {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(iso.replace(" ", "T") + "Z"));
+  }).format(new Date(iso));
 }
 
 export function slugify(input: string): string {

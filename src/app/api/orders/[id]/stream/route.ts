@@ -21,7 +21,7 @@ export async function GET(
   }
 
   const { id } = await params;
-  const order = getOrderById(id);
+  const order = await getOrderById(id);
   if (!order || order.user_id !== session.user.id) {
     return new Response("Not found", { status: 404 });
   }

@@ -1,5 +1,9 @@
-import "./schema";
-import { db } from "./index";
+import { db, unwrap } from "./index";
+
+// All the queries in this file involve joins, GROUP BY and date-range
+// filtering that are much cleaner expressed as SQL than rebuilt with the
+// supabase-js query builder, so they're implemented as Postgres functions
+// (see supabase/schema.sql) and called here via supabase.rpc(...).
 
 export interface DashboardStats {
   totalRevenue: number;
@@ -14,82 +18,33 @@ export interface DashboardStats {
   lowStockCount: number;
 }
 
-export function getDashboardStats(): DashboardStats {
-  const totalRevenue = (
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(total),0) as v FROM orders WHERE status != 'cancelled'`
-      )
-      .get() as { v: number }
-  ).v;
+interface DashboardStatsRow {
+  total_revenue: number;
+  revenue_last30: number;
+  orders_count: number;
+  orders_last30: number;
+  customers_count: number;
+  avg_order_value: number;
+  pending_orders: number;
+  pending_returns: number;
+  refunded_amount: number;
+  low_stock_count: number;
+}
 
-  const revenueLast30 = (
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(total),0) as v FROM orders WHERE status != 'cancelled' AND created_at >= datetime('now','-30 days')`
-      )
-      .get() as { v: number }
-  ).v;
-
-  const ordersCount = (
-    db.prepare(`SELECT COUNT(*) as v FROM orders`).get() as { v: number }
-  ).v;
-
-  const ordersLast30 = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as v FROM orders WHERE created_at >= datetime('now','-30 days')`
-      )
-      .get() as { v: number }
-  ).v;
-
-  const customersCount = (
-    db.prepare(`SELECT COUNT(*) as v FROM users WHERE role = 'customer'`).get() as {
-      v: number;
-    }
-  ).v;
-
-  const pendingOrders = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as v FROM orders WHERE status IN ('pending','processing')`
-      )
-      .get() as { v: number }
-  ).v;
-
-  const pendingReturns = (
-    db
-      .prepare(`SELECT COUNT(*) as v FROM returns WHERE status = 'requested'`)
-      .get() as { v: number }
-  ).v;
-
-  const refundedAmount = (
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(refund_amount),0) as v FROM returns WHERE status = 'refunded'`
-      )
-      .get() as { v: number }
-  ).v;
-
-  const lowStockCount = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as v FROM products WHERE stock <= 10 AND status = 'active'`
-      )
-      .get() as { v: number }
-  ).v;
-
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const rows = unwrap<DashboardStatsRow[]>(await db.rpc("dashboard_stats"));
+  const r = rows[0];
   return {
-    totalRevenue,
-    revenueLast30,
-    ordersCount,
-    ordersLast30,
-    customersCount,
-    avgOrderValue: ordersCount ? totalRevenue / ordersCount : 0,
-    pendingOrders,
-    pendingReturns,
-    refundedAmount,
-    lowStockCount,
+    totalRevenue: r.total_revenue,
+    revenueLast30: r.revenue_last30,
+    ordersCount: r.orders_count,
+    ordersLast30: r.orders_last30,
+    customersCount: r.customers_count,
+    avgOrderValue: r.avg_order_value,
+    pendingOrders: r.pending_orders,
+    pendingReturns: r.pending_returns,
+    refundedAmount: r.refunded_amount,
+    lowStockCount: r.low_stock_count,
   };
 }
 
@@ -99,16 +54,10 @@ export interface RevenuePoint {
   orders: number;
 }
 
-export function getRevenueSeries(days = 14): RevenuePoint[] {
-  const rows = db
-    .prepare(
-      `SELECT date(created_at) as day, COALESCE(SUM(total),0) as revenue, COUNT(*) as orders
-       FROM orders
-       WHERE status != 'cancelled' AND created_at >= datetime('now', ?)
-       GROUP BY date(created_at)
-       ORDER BY day ASC`
-    )
-    .all(`-${days} days`) as unknown as RevenuePoint[];
+export async function getRevenueSeries(days = 14): Promise<RevenuePoint[]> {
+  const rows = unwrap<RevenuePoint[]>(
+    await db.rpc("revenue_series", { days_back: days })
+  );
 
   // fill missing days with zero so the chart doesn't have gaps
   const map = new Map(rows.map((r) => [r.day, r]));
@@ -133,34 +82,13 @@ export interface DateRange {
   end?: string; // 'YYYY-MM-DD', inclusive
 }
 
-function orderDateClause(range: DateRange, alias = "o"): { clause: string; params: string[] } {
-  if (range.start && range.end) {
-    return { clause: `AND date(${alias}.created_at) BETWEEN ? AND ?`, params: [range.start, range.end] };
-  }
-  if (range.start) {
-    return { clause: `AND date(${alias}.created_at) >= ?`, params: [range.start] };
-  }
-  if (range.end) {
-    return { clause: `AND date(${alias}.created_at) <= ?`, params: [range.end] };
-  }
-  return { clause: "", params: [] };
-}
-
-export function getCategoryBreakdown(range: DateRange = {}): CategoryBreakdown[] {
-  const { clause, params } = orderDateClause(range);
-  return db
-    .prepare(
-      `SELECT COALESCE(c.name, 'Uncategorized') as category,
-              COALESCE(SUM(oi.price * oi.quantity),0) as revenue,
-              COALESCE(SUM(oi.quantity),0) as units
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id AND o.status != 'cancelled' ${clause}
-       LEFT JOIN products p ON p.id = oi.product_id
-       LEFT JOIN categories c ON c.id = p.category_id
-       GROUP BY category
-       ORDER BY revenue DESC`
-    )
-    .all(...params) as unknown as CategoryBreakdown[];
+export async function getCategoryBreakdown(range: DateRange = {}): Promise<CategoryBreakdown[]> {
+  return unwrap<CategoryBreakdown[]>(
+    await db.rpc("category_breakdown", {
+      range_start: range.start ?? null,
+      range_end: range.end ?? null,
+    })
+  );
 }
 
 export interface TopProduct {
@@ -173,19 +101,14 @@ export interface TopProduct {
   marginPct?: number;
 }
 
-export function getTopProducts(limit = 5, range: DateRange = {}): TopProduct[] {
-  const { clause, params } = orderDateClause(range);
-  const rows = db
-    .prepare(
-      `SELECT oi.name as name, SUM(oi.quantity) as units, SUM(oi.price*oi.quantity) as revenue,
-              SUM(COALESCE(oi.cost_price,0)*oi.quantity) as cost, oi.image as image
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id AND o.status != 'cancelled' ${clause}
-       GROUP BY oi.name
-       ORDER BY revenue DESC
-       LIMIT ?`
-    )
-    .all(...params, limit) as unknown as (TopProduct & { cost: number })[];
+export async function getTopProducts(limit = 5, range: DateRange = {}): Promise<TopProduct[]> {
+  const rows = unwrap<(TopProduct & { cost: number })[]>(
+    await db.rpc("top_products", {
+      lim: limit,
+      range_start: range.start ?? null,
+      range_end: range.end ?? null,
+    })
+  );
 
   return rows.map((r) => ({
     ...r,
@@ -194,13 +117,15 @@ export function getTopProducts(limit = 5, range: DateRange = {}): TopProduct[] {
   }));
 }
 
-export function getOrderStatusBreakdown(range: DateRange = {}): { status: string; count: number }[] {
-  const { clause, params } = orderDateClause(range, "orders");
-  return db
-    .prepare(
-      `SELECT status, COUNT(*) as count FROM orders WHERE 1=1 ${clause} GROUP BY status ORDER BY count DESC`
-    )
-    .all(...params) as unknown as { status: string; count: number }[];
+export async function getOrderStatusBreakdown(
+  range: DateRange = {}
+): Promise<{ status: string; count: number }[]> {
+  return unwrap<{ status: string; count: number }[]>(
+    await db.rpc("order_status_breakdown", {
+      range_start: range.start ?? null,
+      range_end: range.end ?? null,
+    })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -223,83 +148,44 @@ export interface SalesReport {
   customersCount: number;
 }
 
-export function getSalesReport(range: DateRange = {}): SalesReport {
-  const orderClause = orderDateClause(range);
+interface SalesReportRow {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  gross_margin_pct: number;
+  discounts: number;
+  shipping_collected: number;
+  refunds: number;
+  net_profit: number;
+  orders_count: number;
+  cancelled_count: number;
+  units_sold: number;
+  avg_order_value: number;
+  customers_count: number;
+}
 
-  const orderTotals = db
-    .prepare(
-      `SELECT COALESCE(SUM(total),0) as revenue,
-              COALESCE(SUM(discount),0) as discounts,
-              COALESCE(SUM(shipping_fee),0) as shipping,
-              COUNT(*) as count,
-              COUNT(DISTINCT user_id) as customers
-       FROM orders o WHERE status != 'cancelled' ${orderClause.clause}`
-    )
-    .get(...orderClause.params) as {
-    revenue: number;
-    discounts: number;
-    shipping: number;
-    count: number;
-    customers: number;
-  };
-
-  const cancelledCount = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as c FROM orders o WHERE status = 'cancelled' ${orderClause.clause}`
-      )
-      .get(...orderClause.params) as { c: number }
-  ).c;
-
-  const cogsRow = db
-    .prepare(
-      `SELECT COALESCE(SUM(COALESCE(oi.cost_price,0)*oi.quantity),0) as cogs,
-              COALESCE(SUM(oi.quantity),0) as units
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id AND o.status != 'cancelled' ${orderClause.clause}`
-    )
-    .get(...orderClause.params) as { cogs: number; units: number };
-
-  // Refunds are attributed to the day they were resolved (falling back to
-  // request date), since that's when the money actually leaves the store.
-  let refundClause = "";
-  let refundParams: string[] = [];
-  if (range.start && range.end) {
-    refundClause = `AND date(COALESCE(resolved_at, created_at)) BETWEEN ? AND ?`;
-    refundParams = [range.start, range.end];
-  } else if (range.start) {
-    refundClause = `AND date(COALESCE(resolved_at, created_at)) >= ?`;
-    refundParams = [range.start];
-  } else if (range.end) {
-    refundClause = `AND date(COALESCE(resolved_at, created_at)) <= ?`;
-    refundParams = [range.end];
-  }
-  const refunds = (
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(refund_amount),0) as v FROM returns WHERE status = 'refunded' ${refundClause}`
-      )
-      .get(...refundParams) as { v: number }
-  ).v;
-
-  const revenue = orderTotals.revenue;
-  const cogs = cogsRow.cogs;
-  const grossProfit = revenue - cogs;
-
+export async function getSalesReport(range: DateRange = {}): Promise<SalesReport> {
+  const rows = unwrap<SalesReportRow[]>(
+    await db.rpc("sales_report", {
+      range_start: range.start ?? null,
+      range_end: range.end ?? null,
+    })
+  );
+  const r = rows[0];
   return {
-    revenue,
-    cogs,
-    grossProfit,
-    grossMarginPct: revenue > 0 ? (grossProfit / revenue) * 100 : 0,
-    discounts: orderTotals.discounts,
-    shippingCollected: orderTotals.shipping,
-    refunds,
-    netProfit: grossProfit - refunds,
-    ordersCount: orderTotals.count,
-    cancelledCount,
-    unitsSold: cogsRow.units,
-    avgOrderValue: orderTotals.count ? revenue / orderTotals.count : 0,
-    customersCount: orderTotals.customers,
+    revenue: r.revenue,
+    cogs: r.cogs,
+    grossProfit: r.gross_profit,
+    grossMarginPct: r.gross_margin_pct,
+    discounts: r.discounts,
+    shippingCollected: r.shipping_collected,
+    refunds: r.refunds,
+    netProfit: r.net_profit,
+    ordersCount: r.orders_count,
+    cancelledCount: r.cancelled_count,
+    unitsSold: r.units_sold,
+    avgOrderValue: r.avg_order_value,
+    customersCount: r.customers_count,
   };
 }
 
@@ -311,22 +197,13 @@ export interface DailySalesPoint {
   orders: number;
 }
 
-export function getSalesSeries(startDate: string, endDate: string): DailySalesPoint[] {
-  const rows = db
-    .prepare(
-      `SELECT date(o.created_at) as day,
-              COALESCE(SUM(o.total),0) as revenue,
-              COUNT(DISTINCT o.id) as orders,
-              COALESCE((
-                SELECT SUM(COALESCE(oi.cost_price,0) * oi.quantity)
-                FROM order_items oi WHERE oi.order_id = o.id
-              ), 0) as cost
-       FROM orders o
-       WHERE o.status != 'cancelled' AND date(o.created_at) BETWEEN ? AND ?
-       GROUP BY date(o.created_at)
-       ORDER BY day ASC`
-    )
-    .all(startDate, endDate) as unknown as DailySalesPoint[];
+export async function getSalesSeries(
+  startDate: string,
+  endDate: string
+): Promise<DailySalesPoint[]> {
+  const rows = unwrap<Omit<DailySalesPoint, "profit">[]>(
+    await db.rpc("sales_series", { start_date: startDate, end_date: endDate })
+  );
 
   const map = new Map(rows.map((r) => [r.day, r]));
   const result: DailySalesPoint[] = [];

@@ -1,32 +1,40 @@
-import "./schema";
-import { db, genId } from "./index";
+import { db, genId, unwrap } from "./index";
 import type { Product, Category, ProductType } from "@/types";
 
-export function listCategories(): Category[] {
-  return db
-    .prepare(`SELECT * FROM categories ORDER BY sort_order ASC, name ASC`)
-    .all() as unknown as Category[];
+export async function listCategories(): Promise<Category[]> {
+  const { data, error } = await db
+    .from("categories")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as Category[]) ?? [];
 }
 
-export function getCategoryBySlug(slug: string): Category | undefined {
-  return db.prepare(`SELECT * FROM categories WHERE slug = ?`).get(slug) as
-    | Category
-    | undefined;
+export async function getCategoryBySlug(slug: string): Promise<Category | undefined> {
+  const { data, error } = await db
+    .from("categories")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Category) ?? undefined;
 }
 
-export function getCategoryById(id: string): Category | undefined {
-  return db.prepare(`SELECT * FROM categories WHERE id = ?`).get(id) as
-    | Category
-    | undefined;
+export async function getCategoryById(id: string): Promise<Category | undefined> {
+  const { data, error } = await db.from("categories").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Category) ?? undefined;
 }
 
-export function listCategoriesWithCounts(): (Category & { product_count: number })[] {
-  return db
-    .prepare(
-      `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) as product_count
-       FROM categories c ORDER BY c.sort_order ASC, c.name ASC`
-    )
-    .all() as unknown as (Category & { product_count: number })[];
+export async function listCategoriesWithCounts(): Promise<
+  (Category & { product_count: number })[]
+> {
+  const categories = await listCategories();
+  const counts = await Promise.all(
+    categories.map((c) => countProductsInCategory(c.id))
+  );
+  return categories.map((c, i) => ({ ...c, product_count: counts[i] }));
 }
 
 export interface CategoryInput {
@@ -37,51 +45,53 @@ export interface CategoryInput {
   sort_order?: number;
 }
 
-export function createCategory(input: CategoryInput): Category {
+export async function createCategory(input: CategoryInput): Promise<Category> {
   const id = genId("cat");
-  db.prepare(
-    `INSERT INTO categories (id, name, slug, description, icon, sort_order) VALUES (?,?,?,?,?,?)`
-  ).run(
+  const { error } = await db.from("categories").insert({
     id,
-    input.name,
-    input.slug,
-    input.description ?? null,
-    input.icon ?? null,
-    input.sort_order ?? 0
-  );
-  return getCategoryById(id)!;
+    name: input.name,
+    slug: input.slug,
+    description: input.description ?? null,
+    icon: input.icon ?? null,
+    sort_order: input.sort_order ?? 0,
+  });
+  if (error) throw new Error(error.message);
+  return (await getCategoryById(id))!;
 }
 
-export function updateCategory(
+export async function updateCategory(
   id: string,
   input: Partial<CategoryInput>
-): Category | undefined {
-  const existing = getCategoryById(id);
-  if (!existing) return undefined;
-  const merged = { ...existing, ...input };
-  db.prepare(
-    `UPDATE categories SET name=?, slug=?, description=?, icon=?, sort_order=? WHERE id=?`
-  ).run(
-    merged.name,
-    merged.slug,
-    merged.description,
-    merged.icon,
-    merged.sort_order,
-    id
-  );
-  return getCategoryById(id);
+): Promise<Category | undefined> {
+  const payload: Record<string, unknown> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.slug !== undefined) payload.slug = input.slug;
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.icon !== undefined) payload.icon = input.icon;
+  if (input.sort_order !== undefined) payload.sort_order = input.sort_order;
+
+  const { data, error } = await db
+    .from("categories")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Category) ?? undefined;
 }
 
-export function countProductsInCategory(id: string): number {
-  return (
-    db
-      .prepare(`SELECT COUNT(*) as c FROM products WHERE category_id = ?`)
-      .get(id) as { c: number }
-  ).c;
+export async function countProductsInCategory(id: string): Promise<number> {
+  const { count, error } = await db
+    .from("products")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", id);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
-export function deleteCategory(id: string): void {
-  db.prepare(`DELETE FROM categories WHERE id = ?`).run(id);
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await db.from("categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export interface ProductFilters {
@@ -97,107 +107,118 @@ export interface ProductFilters {
   offset?: number;
 }
 
-const BASE_SELECT = `
-  SELECT p.*, c.name as category_name, c.slug as category_slug
-  FROM products p
-  LEFT JOIN categories c ON c.id = p.category_id
-`;
+// PostgREST's `.or()` filter syntax uses `,` `(` `)` as structural
+// characters — strip them out of free-text search input so a stray
+// character in a search box can't break (or redefine) the filter.
+function sanitizeSearchTerm(q: string): string {
+  return q.replace(/[,()]/g, " ").trim();
+}
 
-export function listProducts(filters: ProductFilters = {}): {
+type ProductRow = Omit<Product, "category_name" | "category_slug"> & {
+  categories: { name: string; slug: string } | null;
+};
+
+function flattenProduct(row: ProductRow): Product {
+  const { categories, ...rest } = row;
+  return {
+    ...rest,
+    category_name: categories?.name,
+    category_slug: categories?.slug,
+  };
+}
+
+export async function listProducts(filters: ProductFilters = {}): Promise<{
   items: Product[];
   total: number;
-} {
-  const where: string[] = [];
-  const params: (string | number)[] = [];
-  if (filters.status && filters.status !== "all") {
-    where.push(`p.status = ?`);
-    params.push(filters.status);
-  } else if (!filters.status) {
-    where.push(`p.status = ?`);
-    params.push("active");
-  }
-
-  if (filters.q) {
-    where.push(`(p.name LIKE ? OR p.brand LIKE ? OR p.tags LIKE ?)`);
-    const like = `%${filters.q}%`;
-    params.push(like, like, like);
-  }
+}> {
+  let categoryId: string | null | undefined;
   if (filters.category) {
-    where.push(`c.slug = ?`);
-    params.push(filters.category);
-  }
-  if (filters.type) {
-    where.push(`p.type = ?`);
-    params.push(filters.type);
-  }
-  if (filters.minPrice !== undefined) {
-    where.push(`p.price >= ?`);
-    params.push(filters.minPrice);
-  }
-  if (filters.maxPrice !== undefined) {
-    where.push(`p.price <= ?`);
-    params.push(filters.maxPrice);
-  }
-  if (filters.featured) {
-    where.push(`p.featured = 1`);
+    const cat = await getCategoryBySlug(filters.category);
+    if (!cat) return { items: [], total: 0 };
+    categoryId = cat.id;
   }
 
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  let query = db.from("products").select("*, categories(name, slug)", { count: "exact" });
 
-  let orderBy = "p.created_at DESC";
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  } else if (!filters.status) {
+    query = query.eq("status", "active");
+  }
+  if (filters.q) {
+    const term = sanitizeSearchTerm(filters.q);
+    if (term) {
+      query = query.or(`name.ilike.%${term}%,brand.ilike.%${term}%,tags.ilike.%${term}%`);
+    }
+  }
+  if (categoryId) query = query.eq("category_id", categoryId);
+  if (filters.type) query = query.eq("type", filters.type);
+  if (filters.minPrice !== undefined) query = query.gte("price", filters.minPrice);
+  if (filters.maxPrice !== undefined) query = query.lte("price", filters.maxPrice);
+  if (filters.featured) query = query.eq("featured", 1);
+
   switch (filters.sort) {
     case "price_asc":
-      orderBy = "p.price ASC";
+      query = query.order("price", { ascending: true });
       break;
     case "price_desc":
-      orderBy = "p.price DESC";
+      query = query.order("price", { ascending: false });
       break;
     case "rating":
-      orderBy = "p.rating DESC";
+      query = query.order("rating", { ascending: false });
       break;
     case "featured":
-      orderBy = "p.featured DESC, p.created_at DESC";
+      query = query
+        .order("featured", { ascending: false })
+        .order("created_at", { ascending: false });
       break;
+    default:
+      query = query.order("created_at", { ascending: false });
   }
-
-  const total = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as c FROM products p LEFT JOIN categories c ON c.id = p.category_id ${whereClause}`
-      )
-      .get(...params) as { c: number }
-  ).c;
 
   const limit = filters.limit ?? 24;
   const offset = filters.offset ?? 0;
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
 
-  const items = db
-    .prepare(
-      `${BASE_SELECT} ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
-    )
-    .all(...params, limit, offset) as unknown as Product[];
-
-  return { items, total };
+  return {
+    items: ((data as unknown as ProductRow[]) ?? []).map(flattenProduct),
+    total: count ?? 0,
+  };
 }
 
-export function getProductBySlug(slug: string): Product | undefined {
-  return db.prepare(`${BASE_SELECT} WHERE p.slug = ?`).get(slug) as
-    | Product
-    | undefined;
+export async function getProductBySlug(slug: string): Promise<Product | undefined> {
+  const { data, error } = await db
+    .from("products")
+    .select("*, categories(name, slug)")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? flattenProduct(data as unknown as ProductRow) : undefined;
 }
 
-export function getProductById(id: string): Product | undefined {
-  return db.prepare(`${BASE_SELECT} WHERE p.id = ?`).get(id) as
-    | Product
-    | undefined;
+export async function getProductById(id: string): Promise<Product | undefined> {
+  const { data, error } = await db
+    .from("products")
+    .select("*, categories(name, slug)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? flattenProduct(data as unknown as ProductRow) : undefined;
 }
 
-export function getRelatedProducts(product: Product, limit = 4): Product[] {
-  return db
-    .prepare(
-      `${BASE_SELECT} WHERE p.category_id = ? AND p.id != ? AND p.status = 'active' ORDER BY p.rating DESC LIMIT ?`
-    )
-    .all(product.category_id, product.id, limit) as unknown as Product[];
+export async function getRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
+  if (!product.category_id) return [];
+  const { data, error } = await db
+    .from("products")
+    .select("*, categories(name, slug)")
+    .eq("category_id", product.category_id)
+    .neq("id", product.id)
+    .eq("status", "active")
+    .order("rating", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return ((data as unknown as ProductRow[]) ?? []).map(flattenProduct);
 }
 
 export interface ProductInput {
@@ -222,106 +243,74 @@ export interface ProductInput {
   tags?: string[];
 }
 
-export function createProduct(input: ProductInput): Product {
+export async function createProduct(input: ProductInput): Promise<Product> {
   const id = genId("prod");
-  db.prepare(
-    `INSERT INTO products (
-      id, name, slug, description, short_description, category_id, brand, type,
-      price, compare_at_price, cost_price, stock, sku, unit, image, images,
-      requires_prescription, featured, status, tags
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  ).run(
+  const { error } = await db.from("products").insert({
     id,
-    input.name,
-    input.slug,
-    input.description ?? null,
-    input.short_description ?? null,
-    input.category_id ?? null,
-    input.brand ?? null,
-    input.type,
-    input.price,
-    input.compare_at_price ?? null,
-    input.cost_price ?? null,
-    input.stock,
-    input.sku ?? null,
-    input.unit ?? null,
-    input.image ?? null,
-    JSON.stringify(input.images ?? []),
-    input.requires_prescription ? 1 : 0,
-    input.featured ? 1 : 0,
-    input.status ?? "active",
-    JSON.stringify(input.tags ?? [])
-  );
-  return getProductById(id)!;
+    name: input.name,
+    slug: input.slug,
+    description: input.description ?? null,
+    short_description: input.short_description ?? null,
+    category_id: input.category_id ?? null,
+    brand: input.brand ?? null,
+    type: input.type,
+    price: input.price,
+    compare_at_price: input.compare_at_price ?? null,
+    cost_price: input.cost_price ?? null,
+    stock: input.stock,
+    sku: input.sku ?? null,
+    unit: input.unit ?? null,
+    image: input.image ?? null,
+    images: JSON.stringify(input.images ?? []),
+    requires_prescription: input.requires_prescription ? 1 : 0,
+    featured: input.featured ? 1 : 0,
+    status: input.status ?? "active",
+    tags: JSON.stringify(input.tags ?? []),
+  });
+  if (error) throw new Error(error.message);
+  return (await getProductById(id))!;
 }
 
-export function updateProduct(
+export async function updateProduct(
   id: string,
   input: Partial<ProductInput>
-): Product | undefined {
-  const existing = getProductById(id);
-  if (!existing) return undefined;
-  const merged = {
-    ...existing,
-    ...input,
-    images: input.images ? JSON.stringify(input.images) : existing.images,
-    tags: input.tags ? JSON.stringify(input.tags) : existing.tags,
-    requires_prescription:
-      input.requires_prescription !== undefined
-        ? input.requires_prescription
-          ? 1
-          : 0
-        : existing.requires_prescription,
-    featured:
-      input.featured !== undefined
-        ? input.featured
-          ? 1
-          : 0
-        : existing.featured,
-  };
-  db.prepare(
-    `UPDATE products SET name=?, slug=?, description=?, short_description=?, category_id=?,
-      brand=?, type=?, price=?, compare_at_price=?, cost_price=?, stock=?, sku=?, unit=?,
-      image=?, images=?, requires_prescription=?, featured=?, status=?, tags=?, updated_at=datetime('now')
-     WHERE id=?`
-  ).run(
-    merged.name,
-    merged.slug,
-    merged.description,
-    merged.short_description,
-    merged.category_id,
-    merged.brand,
-    merged.type,
-    merged.price,
-    merged.compare_at_price,
-    merged.cost_price,
-    merged.stock,
-    merged.sku,
-    merged.unit,
-    merged.image,
-    merged.images,
-    merged.requires_prescription,
-    merged.featured,
-    merged.status,
-    merged.tags,
-    id
-  );
+): Promise<Product | undefined> {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.slug !== undefined) payload.slug = input.slug;
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.short_description !== undefined) payload.short_description = input.short_description;
+  if (input.category_id !== undefined) payload.category_id = input.category_id;
+  if (input.brand !== undefined) payload.brand = input.brand;
+  if (input.type !== undefined) payload.type = input.type;
+  if (input.price !== undefined) payload.price = input.price;
+  if (input.compare_at_price !== undefined) payload.compare_at_price = input.compare_at_price;
+  if (input.cost_price !== undefined) payload.cost_price = input.cost_price;
+  if (input.stock !== undefined) payload.stock = input.stock;
+  if (input.sku !== undefined) payload.sku = input.sku;
+  if (input.unit !== undefined) payload.unit = input.unit;
+  if (input.image !== undefined) payload.image = input.image;
+  if (input.images !== undefined) payload.images = JSON.stringify(input.images);
+  if (input.requires_prescription !== undefined)
+    payload.requires_prescription = input.requires_prescription ? 1 : 0;
+  if (input.featured !== undefined) payload.featured = input.featured ? 1 : 0;
+  if (input.status !== undefined) payload.status = input.status;
+  if (input.tags !== undefined) payload.tags = JSON.stringify(input.tags);
+
+  const { error } = await db.from("products").update(payload).eq("id", id);
+  if (error) throw new Error(error.message);
   return getProductById(id);
 }
 
-export function deleteProduct(id: string): void {
-  db.prepare(`DELETE FROM products WHERE id = ?`).run(id);
+export async function deleteProduct(id: string): Promise<void> {
+  const { error } = await db.from("products").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
-export function decrementStock(productId: string, qty: number): void {
-  db.prepare(
-    `UPDATE products SET stock = MAX(stock - ?, 0) WHERE id = ?`
-  ).run(qty, productId);
+export async function decrementStock(productId: string, qty: number): Promise<void> {
+  unwrap(await db.rpc("decrement_stock", { pid: productId, qty }));
 }
 
-export function restockProduct(productId: string, qty: number): void {
-  db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ?`).run(
-    qty,
-    productId
-  );
+export async function restockProduct(productId: string, qty: number): Promise<void> {
+  unwrap(await db.rpc("restock_product", { pid: productId, qty }));
 }

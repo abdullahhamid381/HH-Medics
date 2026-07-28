@@ -7,10 +7,10 @@ import { ProductCard } from "@/components/site/product-card";
 import { LinkButton } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 
-export default function HomePage() {
-  const categories = listCategories();
-  const { items: featured } = listProducts({ featured: true, limit: 8 });
-  const { items: newest } = listProducts({ sort: "newest", limit: 8 });
+export default async function HomePage() {
+  const categories = await listCategories();
+  const { items: featured } = await listProducts({ featured: true, limit: 8 });
+  const { items: newest } = await listProducts({ sort: "newest", limit: 8 });
   const heroProduct = featured[0];
 
   return (

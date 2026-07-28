@@ -1,8 +1,8 @@
 import { listCategories } from "@/lib/db/products";
 import { ProductForm } from "@/components/admin/product-form";
 
-export default function NewProductPage() {
-  const categories = listCategories();
+export default async function NewProductPage() {
+  const categories = await listCategories();
   return (
     <div>
       <div className="mb-6">

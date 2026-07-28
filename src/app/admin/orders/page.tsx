@@ -23,7 +23,7 @@ export default async function AdminOrdersPage({
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const activeStatus = (status as OrderStatus | "all") ?? "all";
 
-  const { items, total } = listOrders({
+  const { items, total } = await listOrders({
     status: activeStatus,
     q,
     limit: PAGE_SIZE,

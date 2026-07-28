@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const { name, email, password } = parsed.data;
     const normalizedEmail = email.toLowerCase();
 
-    if (getUserByEmail(normalizedEmail)) {
+    if (await getUserByEmail(normalizedEmail)) {
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = createUser({
+    const user = await createUser({
       name,
       email: normalizedEmail,
       password_hash: passwordHash,

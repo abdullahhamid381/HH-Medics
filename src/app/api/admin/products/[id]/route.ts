@@ -38,7 +38,7 @@ export async function PUT(
       { status: 400 }
     );
   }
-  const product = updateProduct(id, parsed.data as never);
+  const product = await updateProduct(id, parsed.data as never);
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
@@ -53,6 +53,6 @@ export async function DELETE(
   if (response) return response;
 
   const { id } = await params;
-  deleteProduct(id);
+  await deleteProduct(id);
   return NextResponse.json({ ok: true });
 }

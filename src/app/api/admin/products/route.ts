@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const input = parsed.data;
-  const product = createProduct({
+  const product = await createProduct({
     ...input,
     type: input.type as never,
     slug: `${slugify(input.name)}-${Date.now().toString(36).slice(-4)}`,

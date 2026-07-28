@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const lines = [];
   let subtotal = 0;
   for (const item of input.items) {
-    const product = getProductById(item.productId);
+    const product = await getProductById(item.productId);
     if (!product) {
       return NextResponse.json(
         { error: `A product in your cart is no longer available` },
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
   let discount = 0;
   if (input.couponCode) {
-    const coupon = getCouponByCode(input.couponCode);
+    const coupon = await getCouponByCode(input.couponCode);
     if (coupon) {
       discount = Math.round((subtotal * coupon.discount_percent) / 100);
     }
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   const shippingFee = subtotal - discount > 3000 ? 0 : 200;
   const total = subtotal - discount + shippingFee;
 
-  const order = createOrder({
+  const order = await createOrder({
     userId: session.user.id,
     items: lines,
     subtotal,

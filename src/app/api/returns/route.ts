@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
   const input = parsed.data;
 
-  const order = getOrderById(input.orderId);
+  const order = await getOrderById(input.orderId);
   if (!order || order.user_id !== session.user.id) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Order item not found" }, { status: 404 });
   }
 
-  const returnRequest = createReturn({
+  const returnRequest = await createReturn({
     orderId: order.id,
     orderItemId: item.id,
     userId: session.user.id,

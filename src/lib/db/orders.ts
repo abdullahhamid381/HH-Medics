@@ -1,4 +1,3 @@
-import "./schema";
 import { db, genId } from "./index";
 import type { Order, OrderItem, OrderStatus, CartLine } from "@/types";
 import { decrementStock, restockProduct } from "./products";
@@ -10,11 +9,12 @@ import { decrementStock, restockProduct } from "./products";
 // cost_price directly via dedicated queries in analytics.ts / getOrderItemsWithCost.
 const ORDER_ITEM_COLUMNS = "id, order_id, product_id, name, image, price, quantity";
 
-function nextOrderNumber(): string {
-  const count = (
-    db.prepare(`SELECT COUNT(*) as c FROM orders`).get() as { c: number }
-  ).c;
-  return `MS-${String(10000 + count + 1)}`;
+async function nextOrderNumber(): Promise<string> {
+  const { count, error } = await db
+    .from("orders")
+    .select("*", { count: "exact", head: true });
+  if (error) throw new Error(error.message);
+  return `MS-${String(10000 + (count ?? 0) + 1)}`;
 }
 
 export interface CreateOrderInput {
@@ -35,88 +35,95 @@ export interface CreateOrderInput {
   notes?: string;
 }
 
-export function createOrder(input: CreateOrderInput): Order {
+export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const id = genId("order");
-  const orderNumber = nextOrderNumber();
-  db.prepare(
-    `INSERT INTO orders (
-      id, order_number, user_id, status, payment_method, payment_status,
-      subtotal, discount, shipping_fee, total, coupon_code,
-      full_name, phone, address_line1, city, state, postal_code, notes
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  ).run(
+  const orderNumber = await nextOrderNumber();
+
+  const { error: orderError } = await db.from("orders").insert({
     id,
-    orderNumber,
-    input.userId,
-    "pending",
-    input.paymentMethod,
-    input.paymentMethod === "card" ? "paid" : "unpaid",
-    input.subtotal,
-    input.discount,
-    input.shippingFee,
-    input.total,
-    input.couponCode ?? null,
-    input.fullName,
-    input.phone,
-    input.addressLine1,
-    input.city,
-    input.state,
-    input.postalCode,
-    input.notes ?? null
-  );
+    order_number: orderNumber,
+    user_id: input.userId,
+    status: "pending",
+    payment_method: input.paymentMethod,
+    payment_status: input.paymentMethod === "card" ? "paid" : "unpaid",
+    subtotal: input.subtotal,
+    discount: input.discount,
+    shipping_fee: input.shippingFee,
+    total: input.total,
+    coupon_code: input.couponCode ?? null,
+    full_name: input.fullName,
+    phone: input.phone,
+    address_line1: input.addressLine1,
+    city: input.city,
+    state: input.state,
+    postal_code: input.postalCode,
+    notes: input.notes ?? null,
+  });
+  if (orderError) throw new Error(orderError.message);
 
-  const insertItem = db.prepare(
-    `INSERT INTO order_items (id, order_id, product_id, name, image, price, quantity, cost_price)
-     VALUES (?,?,?,?,?,?,?,?)`
+  const { error: itemsError } = await db.from("order_items").insert(
+    input.items.map((line) => ({
+      id: genId("item"),
+      order_id: id,
+      product_id: line.productId,
+      name: line.name,
+      image: line.image,
+      price: line.price,
+      quantity: line.quantity,
+      cost_price: line.costPrice ?? null,
+    }))
   );
-  for (const line of input.items) {
-    insertItem.run(
-      genId("item"),
-      id,
-      line.productId,
-      line.name,
-      line.image,
-      line.price,
-      line.quantity,
-      line.costPrice ?? null
-    );
-    decrementStock(line.productId, line.quantity);
-  }
+  if (itemsError) throw new Error(itemsError.message);
 
-  return getOrderById(id)!;
+  await Promise.all(input.items.map((line) => decrementStock(line.productId, line.quantity)));
+
+  return (await getOrderById(id))!;
 }
 
-export function getOrderById(id: string): Order | undefined {
-  const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(id) as
-    | Order
-    | undefined;
-  if (!order) return undefined;
-  order.items = db
-    .prepare(`SELECT ${ORDER_ITEM_COLUMNS} FROM order_items WHERE order_id = ?`)
-    .all(id) as unknown as OrderItem[];
+export async function getOrderById(id: string): Promise<Order | undefined> {
+  const { data, error } = await db.from("orders").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return undefined;
+  const order = data as Order;
+  order.items = await getOrderItems(id);
   return order;
 }
 
-export function getOrderByNumber(orderNumber: string): Order | undefined {
-  const order = db
-    .prepare(`SELECT * FROM orders WHERE order_number = ?`)
-    .get(orderNumber) as Order | undefined;
-  if (!order) return undefined;
-  order.items = db
-    .prepare(`SELECT ${ORDER_ITEM_COLUMNS} FROM order_items WHERE order_id = ?`)
-    .all(order.id) as unknown as OrderItem[];
+export async function getOrderByNumber(orderNumber: string): Promise<Order | undefined> {
+  const { data, error } = await db
+    .from("orders")
+    .select("*")
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return undefined;
+  const order = data as Order;
+  order.items = await getOrderItems(order.id);
   return order;
 }
 
-export function listOrdersForUser(userId: string): Order[] {
-  const orders = db
-    .prepare(`SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC`)
-    .all(userId) as unknown as Order[];
-  for (const order of orders) {
-    order.items = db
-      .prepare(`SELECT ${ORDER_ITEM_COLUMNS} FROM order_items WHERE order_id = ?`)
-      .all(order.id) as unknown as OrderItem[];
-  }
+async function getOrderItems(orderId: string): Promise<OrderItem[]> {
+  const { data, error } = await db
+    .from("order_items")
+    .select(ORDER_ITEM_COLUMNS)
+    .eq("order_id", orderId);
+  if (error) throw new Error(error.message);
+  return (data as unknown as OrderItem[]) ?? [];
+}
+
+export async function listOrdersForUser(userId: string): Promise<Order[]> {
+  const { data, error } = await db
+    .from("orders")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const orders = (data as Order[]) ?? [];
+  await Promise.all(
+    orders.map(async (order) => {
+      order.items = await getOrderItems(order.id);
+    })
+  );
   return orders;
 }
 
@@ -127,49 +134,56 @@ export interface OrderFilters {
   offset?: number;
 }
 
-export function listOrders(filters: OrderFilters = {}): {
+export async function listOrders(filters: OrderFilters = {}): Promise<{
   items: Order[];
   total: number;
-} {
-  const where: string[] = [];
-  const params: (string | number)[] = [];
+}> {
+  let query = db.from("orders").select("*, customer:users(name, email)", { count: "exact" });
+
   if (filters.status && filters.status !== "all") {
-    where.push(`o.status = ?`);
-    params.push(filters.status);
+    query = query.eq("status", filters.status);
   }
   if (filters.q) {
-    where.push(`(o.order_number LIKE ? OR o.full_name LIKE ? OR u.email LIKE ?)`);
-    const like = `%${filters.q}%`;
-    params.push(like, like, like);
+    const term = filters.q.replace(/[,()%]/g, " ").trim();
+    if (term) {
+      const { data: matchingUsers } = await db
+        .from("users")
+        .select("id")
+        .ilike("email", `%${term}%`);
+      const userIds = (matchingUsers as { id: string }[] | null)?.map((u) => u.id) ?? [];
+      const orClauses = [`order_number.ilike.%${term}%`, `full_name.ilike.%${term}%`];
+      if (userIds.length > 0) {
+        orClauses.push(`user_id.in.(${userIds.join(",")})`);
+      }
+      query = query.or(orClauses.join(","));
+    }
   }
-  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
   const limit = filters.limit ?? 20;
   const offset = filters.offset ?? 0;
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
 
-  const total = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as c FROM orders o LEFT JOIN users u ON u.id = o.user_id ${whereClause}`
-      )
-      .get(...params) as { c: number }
-  ).c;
+  const rows = (data as unknown as (Order & {
+    customer: { name: string; email: string } | null;
+  })[]) ?? [];
+  const items: Order[] = rows.map((row) => {
+    const { customer, ...order } = row;
+    return {
+      ...order,
+      customer_name: customer?.name,
+      customer_email: customer?.email,
+    };
+  });
+  await Promise.all(
+    items.map(async (order) => {
+      order.items = await getOrderItems(order.id);
+    })
+  );
 
-  const items = db
-    .prepare(
-      `SELECT o.*, u.name as customer_name, u.email as customer_email
-       FROM orders o LEFT JOIN users u ON u.id = o.user_id
-       ${whereClause}
-       ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
-    )
-    .all(...params, limit, offset) as unknown as Order[];
-
-  for (const order of items) {
-    order.items = db
-      .prepare(`SELECT ${ORDER_ITEM_COLUMNS} FROM order_items WHERE order_id = ?`)
-      .all(order.id) as unknown as OrderItem[];
-  }
-
-  return { items, total };
+  return { items, total: count ?? 0 };
 }
 
 export interface OrderFulfillmentInput {
@@ -178,28 +192,27 @@ export interface OrderFulfillmentInput {
   carrier?: string | null;
 }
 
-export function updateOrderFulfillment(
+export async function updateOrderFulfillment(
   id: string,
   input: OrderFulfillmentInput
-): Order | undefined {
-  const existing = getOrderById(id);
+): Promise<Order | undefined> {
+  const existing = await getOrderById(id);
   if (!existing) return undefined;
 
-  const status = input.status ?? existing.status;
-  const trackingNumber =
-    input.trackingNumber !== undefined ? input.trackingNumber : existing.tracking_number;
-  const carrier = input.carrier !== undefined ? input.carrier : existing.carrier;
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.status !== undefined) payload.status = input.status;
+  if (input.trackingNumber !== undefined) payload.tracking_number = input.trackingNumber;
+  if (input.carrier !== undefined) payload.carrier = input.carrier;
 
-  db.prepare(
-    `UPDATE orders SET status = ?, tracking_number = ?, carrier = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(status, trackingNumber, carrier, id);
+  const { error } = await db.from("orders").update(payload).eq("id", id);
+  if (error) throw new Error(error.message);
 
-  if (input.status === "cancelled" && existing.status !== "cancelled") {
-    if (existing.items) {
-      for (const item of existing.items) {
-        if (item.product_id) restockProduct(item.product_id, item.quantity);
-      }
-    }
+  if (input.status === "cancelled" && existing.status !== "cancelled" && existing.items) {
+    await Promise.all(
+      existing.items
+        .filter((item) => item.product_id)
+        .map((item) => restockProduct(item.product_id!, item.quantity))
+    );
   }
 
   return getOrderById(id);
@@ -211,18 +224,22 @@ export interface OrderItemWithCost extends OrderItem {
   cost_price: number | null;
 }
 
-export function getOrderItemsWithCost(orderId: string): OrderItemWithCost[] {
-  return db
-    .prepare(`SELECT * FROM order_items WHERE order_id = ?`)
-    .all(orderId) as unknown as OrderItemWithCost[];
+export async function getOrderItemsWithCost(orderId: string): Promise<OrderItemWithCost[]> {
+  const { data, error } = await db
+    .from("order_items")
+    .select("*")
+    .eq("order_id", orderId);
+  if (error) throw new Error(error.message);
+  return (data as OrderItemWithCost[]) ?? [];
 }
 
-export function updatePaymentStatus(
+export async function updatePaymentStatus(
   id: string,
   paymentStatus: Order["payment_status"]
-) {
-  db.prepare(`UPDATE orders SET payment_status = ? WHERE id = ?`).run(
-    paymentStatus,
-    id
-  );
+): Promise<void> {
+  const { error } = await db
+    .from("orders")
+    .update({ payment_status: paymentStatus })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }

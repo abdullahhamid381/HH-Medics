@@ -36,12 +36,12 @@ export async function PUT(
   let slug: string | undefined;
   if (input.name) {
     slug = slugify(input.name);
-    const existing = getCategoryBySlug(slug);
+    const existing = await getCategoryBySlug(slug);
     if (existing && existing.id !== id) {
       slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
     }
   }
-  const category = updateCategory(id, { ...input, ...(slug ? { slug } : {}) });
+  const category = await updateCategory(id, { ...input, ...(slug ? { slug } : {}) });
   if (!category) {
     return NextResponse.json({ error: "Category not found" }, { status: 404 });
   }
@@ -56,7 +56,7 @@ export async function DELETE(
   if (response) return response;
 
   const { id } = await params;
-  const productCount = countProductsInCategory(id);
+  const productCount = await countProductsInCategory(id);
   if (productCount > 0) {
     return NextResponse.json(
       {
@@ -65,6 +65,6 @@ export async function DELETE(
       { status: 400 }
     );
   }
-  deleteCategory(id);
+  await deleteCategory(id);
   return NextResponse.json({ ok: true });
 }

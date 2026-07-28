@@ -18,7 +18,7 @@ const providers: Provider[] = [
       const password = credentials?.password as string | undefined;
       if (!email || !password) return null;
 
-      const user = getUserByEmail(email.toLowerCase());
+      const user = await getUserByEmail(email.toLowerCase());
       if (!user || !user.password_hash) return null;
 
       const valid = await bcrypt.compare(password, user.password_hash);
@@ -55,9 +55,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig.callbacks,
     async signIn({ user, account }) {
       if (account?.provider === "google" && user.email) {
-        const existing = getUserByEmail(user.email.toLowerCase());
+        const existing = await getUserByEmail(user.email.toLowerCase());
         if (!existing) {
-          createUser({
+          await createUser({
             name: user.name ?? "Google User",
             email: user.email.toLowerCase(),
             image: user.image,
@@ -73,7 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.email = user.email;
       }
       if (user || trigger === "signIn") {
-        const dbUser = getUserByEmail((token.email as string) ?? "");
+        const dbUser = await getUserByEmail((token.email as string) ?? "");
         if (dbUser) {
           token.uid = dbUser.id;
           token.role = dbUser.role;

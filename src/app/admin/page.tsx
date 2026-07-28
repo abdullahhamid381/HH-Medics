@@ -23,12 +23,12 @@ import {
 } from "@/components/admin/dashboard-charts";
 import { formatCurrency } from "@/lib/utils";
 
-export default function AdminOverviewPage() {
-  const stats = getDashboardStats();
-  const revenueSeries = getRevenueSeries(14);
-  const categoryBreakdown = getCategoryBreakdown();
-  const topProducts = getTopProducts(5);
-  const statusBreakdown = getOrderStatusBreakdown();
+export default async function AdminOverviewPage() {
+  const stats = await getDashboardStats();
+  const revenueSeries = await getRevenueSeries(14);
+  const categoryBreakdown = await getCategoryBreakdown();
+  const topProducts = await getTopProducts(5);
+  const statusBreakdown = await getOrderStatusBreakdown();
 
   return (
     <div>

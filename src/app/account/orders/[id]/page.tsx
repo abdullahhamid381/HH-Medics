@@ -28,10 +28,10 @@ export default async function OrderDetailPage({
 
   const { id } = await params;
   const { placed } = await searchParams;
-  const order = getOrderById(id);
+  const order = await getOrderById(id);
   if (!order || order.user_id !== session.user.id) notFound();
 
-  const returns = listReturnsForUser(session.user.id).filter(
+  const returns = (await listReturnsForUser(session.user.id)).filter(
     (r) => r.order_id === order.id
   );
   const returnedItemIds = new Set(returns.map((r) => r.order_item_id));

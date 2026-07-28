@@ -25,9 +25,9 @@ export async function POST(req: NextRequest) {
   }
   const input = parsed.data;
   let slug = slugify(input.name);
-  if (getCategoryBySlug(slug)) {
+  if (await getCategoryBySlug(slug)) {
     slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
   }
-  const category = createCategory({ ...input, slug });
+  const category = await createCategory({ ...input, slug });
   return NextResponse.json({ category });
 }

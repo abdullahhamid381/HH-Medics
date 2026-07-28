@@ -1,8 +1,8 @@
 import { listCategoriesWithCounts } from "@/lib/db/products";
 import { CategoriesTable } from "@/components/admin/categories-table";
 
-export default function AdminCategoriesPage() {
-  const categories = listCategoriesWithCounts();
+export default async function AdminCategoriesPage() {
+  const categories = await listCategoriesWithCounts();
 
   return (
     <div>

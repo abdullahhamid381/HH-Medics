@@ -1,46 +1,51 @@
 import bcrypt from "bcryptjs";
 import { db, genId } from "./index";
-import "./schema";
 
 function img(seed: string) {
   return `https://picsum.photos/seed/${seed}/640/640`;
 }
 
-function reset() {
-  db.exec(`
-    DELETE FROM returns;
-    DELETE FROM order_items;
-    DELETE FROM orders;
-    DELETE FROM reviews;
-    DELETE FROM addresses;
-    DELETE FROM products;
-    DELETE FROM categories;
-    DELETE FROM coupons;
-    DELETE FROM users;
-  `);
+async function deleteAll(table: string) {
+  const { error } = await db.from(table).delete().neq("id", "__never_matches__");
+  if (error) throw new Error(`Failed to clear ${table}: ${error.message}`);
+}
+
+async function reset() {
+  // FK-safe order: children before parents.
+  for (const table of [
+    "returns",
+    "order_items",
+    "orders",
+    "reviews",
+    "addresses",
+    "products",
+    "categories",
+    "coupons",
+    "users",
+  ]) {
+    await deleteAll(table);
+  }
+}
+
+async function insertAll(table: string, rows: Record<string, unknown>[]) {
+  if (rows.length === 0) return;
+  const { error } = await db.from(table).insert(rows);
+  if (error) throw new Error(`Failed to seed ${table}: ${error.message}`);
+}
+
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 async function seed() {
-  reset();
+  await reset();
 
   // --- Users -------------------------------------------------------------
   const adminPass = await bcrypt.hash("Admin@123", 10);
   const demoPass = await bcrypt.hash("Demo@123", 10);
 
   const adminId = genId("user");
-  db.prepare(
-    `INSERT INTO users (id, name, email, password_hash, provider, role) VALUES (?,?,?,?,?,?)`
-  ).run(adminId, "Store Admin", "admin@medistore.test", adminPass, "credentials", "admin");
-
   const demoId = genId("user");
-  db.prepare(
-    `INSERT INTO users (id, name, email, password_hash, provider, role) VALUES (?,?,?,?,?,?)`
-  ).run(demoId, "Sara Khan", "sara@medistore.test", demoPass, "credentials", "customer");
-
-  db.prepare(
-    `INSERT INTO addresses (id, user_id, full_name, phone, line1, city, state, postal_code, is_default)
-     VALUES (?,?,?,?,?,?,?,?,1)`
-  ).run(genId("addr"), demoId, "Sara Khan", "0300-1234567", "House 12, Street 4, F-10", "Islamabad", "Islamabad Capital Territory", "44000");
 
   // A handful more customers so the admin customer list / reports look real.
   const extraCustomerSeeds = [
@@ -51,20 +56,39 @@ async function seed() {
     { name: "Usman Tariq", email: "usman@medistore.test", phone: "0305-6667788", line1: "Plot 14, Gulshan-e-Iqbal", city: "Karachi", state: "Sindh", postal: "75300" },
     { name: "Hira Shahid", email: "hira@medistore.test", phone: "0306-7778899", line1: "House 3, Sector F-8", city: "Islamabad", state: "Islamabad Capital Territory", postal: "44220" },
   ];
+
   const customers: { id: string; name: string; phone: string; line1: string; city: string; state: string; postal: string }[] = [
     { id: demoId, name: "Sara Khan", phone: "0300-1234567", line1: "House 12, Street 4, F-10", city: "Islamabad", state: "Islamabad Capital Territory", postal: "44000" },
+    ...extraCustomerSeeds.map((c) => ({ id: genId("user"), ...c })),
   ];
-  for (const c of extraCustomerSeeds) {
-    const id = genId("user");
-    db.prepare(
-      `INSERT INTO users (id, name, email, password_hash, provider, role) VALUES (?,?,?,?,?,?)`
-    ).run(id, c.name, c.email, demoPass, "credentials", "customer");
-    db.prepare(
-      `INSERT INTO addresses (id, user_id, full_name, phone, line1, city, state, postal_code, is_default)
-       VALUES (?,?,?,?,?,?,?,?,1)`
-    ).run(genId("addr"), id, c.name, c.phone, c.line1, c.city, c.state, c.postal);
-    customers.push({ id, name: c.name, phone: c.phone, line1: c.line1, city: c.city, state: c.state, postal: c.postal });
-  }
+
+  await insertAll("users", [
+    { id: adminId, name: "Store Admin", email: "admin@medistore.test", password_hash: adminPass, provider: "credentials", role: "admin" },
+    { id: demoId, name: "Sara Khan", email: "sara@medistore.test", password_hash: demoPass, provider: "credentials", role: "customer" },
+    ...customers.slice(1).map((c, i) => ({
+      id: c.id,
+      name: c.name,
+      email: extraCustomerSeeds[i].email,
+      password_hash: demoPass,
+      provider: "credentials",
+      role: "customer",
+    })),
+  ]);
+
+  await insertAll(
+    "addresses",
+    customers.map((c) => ({
+      id: genId("addr"),
+      user_id: c.id,
+      full_name: c.name,
+      phone: c.phone,
+      line1: c.line1,
+      city: c.city,
+      state: c.state,
+      postal_code: c.postal,
+      is_default: 1,
+    }))
+  );
 
   // --- Categories ----------------------------------------------------------
   const categories = [
@@ -75,14 +99,20 @@ async function seed() {
     { name: "Cosmetics & Beauty", slug: "cosmetics", icon: "Sparkles", description: "Makeup and beauty essentials." },
   ];
   const catIds: Record<string, string> = {};
-  const insertCat = db.prepare(
-    `INSERT INTO categories (id, name, slug, description, icon, sort_order) VALUES (?,?,?,?,?,?)`
-  );
-  categories.forEach((c, i) => {
-    const id = genId("cat");
-    catIds[c.slug] = id;
-    insertCat.run(id, c.name, c.slug, c.description, c.icon, i);
+  categories.forEach((c) => {
+    catIds[c.slug] = genId("cat");
   });
+  await insertAll(
+    "categories",
+    categories.map((c, i) => ({
+      id: catIds[c.slug],
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      icon: c.icon,
+      sort_order: i,
+    }))
+  );
 
   // --- Products --------------------------------------------------------
   type Seed = {
@@ -126,39 +156,44 @@ async function seed() {
     { name: "SPF 50+ Tinted Sunscreen", type: "cosmetic", cat: "cosmetics", brand: "GlowLab", price: 1290, stock: 160, unit: "50ml", desc: "Broad-spectrum SPF 50+ with a sheer tint that doubles as a light base — no white cast, non-greasy.", short: "Broad-spectrum SPF, no white cast", featured: true, rating: 4.8, reviews: 244 },
   ];
 
-  const insertProduct = db.prepare(
-    `INSERT INTO products (
-      id, name, slug, description, short_description, category_id, brand, type,
-      price, compare_at_price, cost_price, stock, sku, unit, image, images, requires_prescription,
-      rating, reviews_count, featured, status, tags
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-  );
-
   const rand = (n: number) => Math.floor(Math.random() * n);
   const productIds: { id: string; price: number; cost: number; name: string; image: string; stock: number }[] = [];
 
-  products.forEach((p, i) => {
+  const productRows = products.map((p, i) => {
     const id = genId("prod");
     const slug = `${p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
     const compare = p.compare ?? (i % 4 === 0 ? Math.round(p.price * 1.2) : null);
     // cost sits at 55-72% of retail price, varied per product for realistic margins
     const cost = Math.round(p.price * (0.55 + rand(18) / 100));
     const image = img(slug);
-    insertProduct.run(
-      id, p.name, slug, p.desc, p.short, catIds[p.cat], p.brand, p.type,
-      p.price, compare, cost, p.stock, `SKU-${1000 + i}`, p.unit, image,
-      JSON.stringify([image, img(slug + "-2")]), p.rx ? 1 : 0,
-      p.rating, p.reviews, p.featured ? 1 : 0, "active", JSON.stringify([p.type, p.brand])
-    );
     productIds.push({ id, price: p.price, cost, name: p.name, image, stock: p.stock });
+    return {
+      id, name: p.name, slug, description: p.desc, short_description: p.short,
+      category_id: catIds[p.cat], brand: p.brand, type: p.type,
+      price: p.price, compare_at_price: compare, cost_price: cost, stock: p.stock,
+      sku: `SKU-${1000 + i}`, unit: p.unit, image,
+      images: JSON.stringify([image, img(slug + "-2")]),
+      requires_prescription: p.rx ? 1 : 0,
+      rating: p.rating, reviews_count: p.reviews, featured: p.featured ? 1 : 0,
+      status: "active", tags: JSON.stringify([p.type, p.brand]),
+    };
   });
+  await insertAll("products", productRows);
 
   // --- Coupons -----------------------------------------------------------
-  db.prepare(`INSERT INTO coupons (id, code, discount_percent, active) VALUES (?,?,?,1)`).run(genId("cpn"), "WELCOME10", 10);
-  db.prepare(`INSERT INTO coupons (id, code, discount_percent, active) VALUES (?,?,?,1)`).run(genId("cpn"), "HEALTH20", 20);
+  await insertAll("coupons", [
+    { id: genId("cpn"), code: "WELCOME10", discount_percent: 10, active: 1 },
+    { id: genId("cpn"), code: "HEALTH20", discount_percent: 20, active: 1 },
+  ]);
 
   // --- Demo orders across the last ~45 days for analytics -----------------
   const statuses = ["delivered", "delivered", "delivered", "shipped", "processing", "pending", "cancelled"];
+  const reasons = ["Damaged on arrival", "Wrong item received", "Changed my mind", "Product didn't suit me"];
+  const returnStatuses = ["requested", "approved", "refunded", "rejected"];
+
+  const orderRows: Record<string, unknown>[] = [];
+  const orderItemRows: Record<string, unknown>[] = [];
+  const returnRows: Record<string, unknown>[] = [];
 
   for (let i = 0; i < 120; i++) {
     const daysAgo = rand(45);
@@ -166,59 +201,59 @@ async function seed() {
     const orderNumber = `MS-${10001 + i}`;
     const itemCount = 1 + rand(3);
     let subtotal = 0;
-    const chosenItems: { product: (typeof productIds)[number]; qty: number }[] = [];
+    const chosenItems: { product: (typeof productIds)[number]; qty: number; itemId: string }[] = [];
     for (let j = 0; j < itemCount; j++) {
       const product = productIds[rand(productIds.length)];
       const qty = 1 + rand(2);
       subtotal += product.price * qty;
-      chosenItems.push({ product, qty });
+      chosenItems.push({ product, qty, itemId: genId("item") });
     }
     const discount = i % 5 === 0 ? Math.round(subtotal * 0.1) : 0;
     const shipping = subtotal > 3000 ? 0 : 200;
     const total = subtotal - discount + shipping;
     const status = statuses[rand(statuses.length)];
     const customer = customers[rand(customers.length)];
+    const createdAt = daysAgoIso(daysAgo);
 
-    db.prepare(
-      `INSERT INTO orders (
-        id, order_number, user_id, status, payment_method, payment_status,
-        subtotal, discount, shipping_fee, total, full_name, phone,
-        address_line1, city, state, postal_code, created_at, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now', ?), datetime('now', ?))`
-    ).run(
-      orderId, orderNumber, customer.id, status, i % 3 === 0 ? "card" : "cod",
-      status === "cancelled" ? "unpaid" : (i % 3 === 0 ? "paid" : "unpaid"),
-      subtotal, discount, shipping, total, customer.name, customer.phone,
-      customer.line1, customer.city, customer.state, customer.postal,
-      `-${daysAgo} days`, `-${daysAgo} days`
-    );
+    orderRows.push({
+      id: orderId, order_number: orderNumber, user_id: customer.id, status,
+      payment_method: i % 3 === 0 ? "card" : "cod",
+      payment_status: status === "cancelled" ? "unpaid" : i % 3 === 0 ? "paid" : "unpaid",
+      subtotal, discount, shipping_fee: shipping, total,
+      full_name: customer.name, phone: customer.phone,
+      address_line1: customer.line1, city: customer.city, state: customer.state, postal_code: customer.postal,
+      created_at: createdAt, updated_at: createdAt,
+    });
 
-    for (const { product, qty } of chosenItems) {
-      db.prepare(
-        `INSERT INTO order_items (id, order_id, product_id, name, image, price, quantity, cost_price) VALUES (?,?,?,?,?,?,?,?)`
-      ).run(genId("item"), orderId, product.id, product.name, product.image, product.price, qty, product.cost);
+    for (const { product, qty, itemId } of chosenItems) {
+      orderItemRows.push({
+        id: itemId, order_id: orderId, product_id: product.id, name: product.name,
+        image: product.image, price: product.price, quantity: qty, cost_price: product.cost,
+      });
     }
 
     // occasional return/refund request on delivered orders
     if (status === "delivered" && i % 6 === 0) {
-      const firstItem = db
-        .prepare(`SELECT * FROM order_items WHERE order_id = ? LIMIT 1`)
-        .get(orderId) as { id: string; price: number; quantity: number };
-      const returnStatuses = ["requested", "approved", "refunded", "rejected"];
+      const firstItem = chosenItems[0];
       const rStatus = returnStatuses[rand(returnStatuses.length)];
-      db.prepare(
-        `INSERT INTO returns (id, return_number, order_id, order_item_id, user_id, reason, comment, quantity, status, refund_amount, created_at, resolved_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now', ?), ?)`
-      ).run(
-        genId("ret"), `RT-${5001 + i}`, orderId, firstItem.id, customer.id,
-        ["Damaged on arrival", "Wrong item received", "Changed my mind", "Product didn't suit me"][rand(4)],
-        "Requesting a refund for this item.",
-        1, rStatus, firstItem.price,
-        `-${Math.max(daysAgo - 2, 0)} days`,
-        rStatus === "refunded" || rStatus === "approved" || rStatus === "rejected" ? new Date().toISOString() : null
-      );
+      returnRows.push({
+        id: genId("ret"), return_number: `RT-${5001 + i}`, order_id: orderId,
+        order_item_id: firstItem.itemId, user_id: customer.id,
+        reason: reasons[rand(reasons.length)],
+        comment: "Requesting a refund for this item.",
+        quantity: 1, status: rStatus, refund_amount: firstItem.product.price,
+        created_at: daysAgoIso(Math.max(daysAgo - 2, 0)),
+        resolved_at:
+          rStatus === "refunded" || rStatus === "approved" || rStatus === "rejected"
+            ? new Date().toISOString()
+            : null,
+      });
     }
   }
+
+  await insertAll("orders", orderRows);
+  await insertAll("order_items", orderItemRows);
+  await insertAll("returns", returnRows);
 
   console.log("Seed complete:");
   console.log(`  Admin login:  admin@medistore.test / Admin@123`);

@@ -13,14 +13,14 @@ export default async function AdminProductsPage({
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const PAGE_SIZE = 20;
 
-  const { items, total } = listProducts({
+  const { items, total } = await listProducts({
     q,
     status: "all",
     limit: PAGE_SIZE,
     offset: (currentPage - 1) * PAGE_SIZE,
     sort: "newest",
   });
-  const categories = listCategories();
+  const categories = await listCategories();
 
   return (
     <div>

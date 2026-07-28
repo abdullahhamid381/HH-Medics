@@ -1,4 +1,3 @@
-import "./schema";
 import { db } from "./index";
 
 export interface Coupon {
@@ -9,8 +8,13 @@ export interface Coupon {
   expires_at: string | null;
 }
 
-export function getCouponByCode(code: string): Coupon | undefined {
-  return db
-    .prepare(`SELECT * FROM coupons WHERE code = ? AND active = 1`)
-    .get(code.toUpperCase()) as Coupon | undefined;
+export async function getCouponByCode(code: string): Promise<Coupon | undefined> {
+  const { data, error } = await db
+    .from("coupons")
+    .select("*")
+    .eq("code", code.toUpperCase())
+    .eq("active", 1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Coupon) ?? undefined;
 }

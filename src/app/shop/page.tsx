@@ -13,10 +13,10 @@ export default async function ShopPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
-  const categories = listCategories();
+  const categories = await listCategories();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const { items, total } = listProducts({
+  const { items, total } = await listProducts({
     q: params.q,
     category: params.category,
     type: params.type,

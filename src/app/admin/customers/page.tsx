@@ -13,8 +13,8 @@ export default async function AdminCustomersPage({
   const { q, page } = await searchParams;
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
 
-  const customers = listCustomers(PAGE_SIZE, (currentPage - 1) * PAGE_SIZE, q);
-  const total = countCustomers(q);
+  const customers = await listCustomers(PAGE_SIZE, (currentPage - 1) * PAGE_SIZE, q);
+  const total = await countCustomers(q);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function pageHref(p: number) {

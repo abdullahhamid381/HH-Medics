@@ -9,9 +9,9 @@ export default async function AccountPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/account");
 
-  const orders = listOrdersForUser(session.user.id);
-  const returns = listReturnsForUser(session.user.id);
-  const addresses = listAddresses(session.user.id);
+  const orders = await listOrdersForUser(session.user.id);
+  const returns = await listReturnsForUser(session.user.id);
+  const addresses = await listAddresses(session.user.id);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
