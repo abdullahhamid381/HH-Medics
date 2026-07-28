@@ -145,5 +145,8 @@ export interface User {
   provider: string;
   role: "customer" | "admin";
   phone: string | null;
+  email_verified: number;
+  otp_code_hash: string | null;
+  otp_expires_at: string | null;
   created_at: string;
 }

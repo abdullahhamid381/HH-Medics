@@ -24,6 +24,7 @@ export async function createUser(input: {
   image?: string | null;
   provider?: string;
   role?: "customer" | "admin";
+  email_verified?: boolean;
 }): Promise<User> {
   const id = genId("user");
   const { error } = await db.from("users").insert({
@@ -34,9 +35,30 @@ export async function createUser(input: {
     image: input.image ?? null,
     provider: input.provider ?? "credentials",
     role: input.role ?? "customer",
+    email_verified: input.email_verified ? 1 : 0,
   });
   if (error) throw new Error(error.message);
   return (await getUserById(id))!;
+}
+
+export async function setUserOtp(
+  userId: string,
+  otpHash: string,
+  expiresAt: string
+): Promise<void> {
+  const { error } = await db
+    .from("users")
+    .update({ otp_code_hash: otpHash, otp_expires_at: expiresAt })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+}
+
+export async function markEmailVerified(userId: string): Promise<void> {
+  const { error } = await db
+    .from("users")
+    .update({ email_verified: 1, otp_code_hash: null, otp_expires_at: null })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
 }
 
 export interface CustomerRow {

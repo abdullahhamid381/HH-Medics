@@ -63,8 +63,8 @@ async function seed() {
   ];
 
   await insertAll("users", [
-    { id: adminId, name: "Store Admin", email: "admin@medistore.test", password_hash: adminPass, provider: "credentials", role: "admin" },
-    { id: demoId, name: "Sara Khan", email: "sara@medistore.test", password_hash: demoPass, provider: "credentials", role: "customer" },
+    { id: adminId, name: "Store Admin", email: "admin@medistore.test", password_hash: adminPass, provider: "credentials", role: "admin", email_verified: 1 },
+    { id: demoId, name: "Sara Khan", email: "sara@medistore.test", password_hash: demoPass, provider: "credentials", role: "customer", email_verified: 1 },
     ...customers.slice(1).map((c, i) => ({
       id: c.id,
       name: c.name,
@@ -72,6 +72,7 @@ async function seed() {
       password_hash: demoPass,
       provider: "credentials",
       role: "customer",
+      email_verified: 1,
     })),
   ]);
 

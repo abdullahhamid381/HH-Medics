@@ -29,7 +29,9 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
     });
     setLoading(false);
     if (res?.error) {
-      setError("Incorrect email or password.");
+      setError(
+        "Incorrect email or password, or your account isn't verified yet — sign up again with the same email to get a new verification code."
+      );
       return;
     }
     router.push(callbackUrl);

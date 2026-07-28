@@ -20,6 +20,7 @@ const providers: Provider[] = [
 
       const user = await getUserByEmail(email.toLowerCase());
       if (!user || !user.password_hash) return null;
+      if (!user.email_verified) return null;
 
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) return null;
@@ -63,6 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             image: user.image,
             provider: "google",
             role: "customer",
+            email_verified: true,
           });
         }
       }

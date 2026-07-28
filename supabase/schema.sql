@@ -27,8 +27,16 @@ create table if not exists users (
   provider text not null default 'credentials',
   role text not null default 'customer',
   phone text,
+  email_verified integer not null default 0,
+  otp_code_hash text,
+  otp_expires_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Migration for an already-existing users table (safe to re-run):
+alter table users add column if not exists email_verified integer not null default 0;
+alter table users add column if not exists otp_code_hash text;
+alter table users add column if not exists otp_expires_at timestamptz;
 
 create table if not exists addresses (
   id text primary key,

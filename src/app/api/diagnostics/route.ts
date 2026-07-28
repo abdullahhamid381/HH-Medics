@@ -9,6 +9,8 @@ export async function GET() {
       SUPABASE_API_KEY: !!process.env.SUPABASE_API_KEY,
       GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
+      GMAIL_USER: !!process.env.GMAIL_USER,
+      GMAIL_APP_PASSWORD: !!process.env.GMAIL_APP_PASSWORD,
     },
   });
 }
