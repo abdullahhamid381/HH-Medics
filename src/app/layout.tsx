@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
-      <body className="flex min-h-full flex-col bg-bg text-ink">
+      <body className="flex min-h-full flex-col bg-bg text-ink" suppressHydrationWarning>
         <Providers>
           <Header />
           <CartDrawer />
