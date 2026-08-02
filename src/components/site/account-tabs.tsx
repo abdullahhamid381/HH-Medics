@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Package, RotateCcw, MapPin, ChevronRight } from "lucide-react";
 import type { Order, ReturnRequest, Address } from "@/types";
 import { Badge } from "@/components/ui/primitives";
@@ -13,6 +14,7 @@ import {
   RETURN_STATUS_LABELS,
   cn,
 } from "@/lib/utils";
+import { fadeUp, withReducedMotion } from "@/lib/motion";
 
 const ORDER_STATUS_TONE: Record<string, "primary" | "accent" | "warning" | "danger" | "default"> = {
   pending: "warning",
@@ -41,6 +43,7 @@ export function AccountTabs({
   defaultTab?: "orders" | "returns" | "addresses";
 }) {
   const [tab, setTab] = useState<"orders" | "returns" | "addresses">(defaultTab);
+  const reduced = !!useReducedMotion();
 
   const tabs = [
     { key: "orders" as const, label: "Orders", icon: Package, count: orders.length },
@@ -56,132 +59,160 @@ export function AccountTabs({
             key={t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition",
-              tab === t.key
-                ? "border-primary text-primary"
-                : "border-transparent text-ink-soft hover:text-ink"
+              "relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition",
+              tab === t.key ? "text-primary" : "text-ink-soft hover:text-ink"
             )}
           >
             <t.icon size={15} />
             {t.label}
             <span className="rounded-full bg-surface-soft px-1.5 text-xs">{t.count}</span>
+            {tab === t.key && (
+              <motion.div
+                layoutId="account-tab-indicator"
+                className="absolute inset-x-0 -bottom-px h-0.5 bg-primary"
+                transition={reduced ? { duration: 0.01 } : { type: "spring", damping: 30, stiffness: 300 }}
+              />
+            )}
           </button>
         ))}
       </div>
 
-      {tab === "orders" && (
-        <div className="space-y-3">
-          {orders.length === 0 && (
-            <EmptyState label="No orders yet" hint="Your order history will show up here." />
-          )}
-          {orders.map((order) => (
-            <Link
-              key={order.id}
-              href={`/account/orders/${order.id}`}
-              className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 transition hover:border-primary/40"
-            >
-              <div className="flex items-center gap-4">
-                <div className="hidden gap-1 sm:flex">
-                  {order.items?.slice(0, 3).map((item, i) => (
-                    <div
-                      key={i}
-                      className="relative h-12 w-12 overflow-hidden rounded-lg bg-surface-soft"
-                    >
-                      {item.image && (
-                        <Image src={item.image} alt="" fill sizes="48px" className="object-cover" />
-                      )}
-                    </div>
-                  ))}
+      <AnimatePresence mode="wait">
+        {tab === "orders" && (
+          <motion.div
+            key="orders"
+            variants={withReducedMotion(fadeUp, reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="space-y-3"
+          >
+            {orders.length === 0 && (
+              <EmptyState label="No orders yet" hint="Your order history will show up here." />
+            )}
+            {orders.map((order) => (
+              <Link
+                key={order.id}
+                href={`/account/orders/${order.id}`}
+                className="flex items-center justify-between gap-4 rounded-card border border-line bg-surface p-4 shadow-card transition hover:border-primary/40 hover:shadow-elevated"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="hidden gap-1 sm:flex">
+                    {order.items?.slice(0, 3).map((item, i) => (
+                      <div
+                        key={i}
+                        className="relative h-12 w-12 overflow-hidden rounded-panel bg-surface-soft"
+                      >
+                        {item.image && (
+                          <Image src={item.image} alt="" fill sizes="48px" className="object-cover" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="font-mono text-sm text-ink">{order.order_number}</p>
+                    <p className="text-xs text-ink-soft">
+                      {formatDate(order.created_at)} · {order.items?.length ?? 0} item(s)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-mono text-sm text-ink">{order.order_number}</p>
-                  <p className="text-xs text-ink-soft">
-                    {formatDate(order.created_at)} · {order.items?.length ?? 0} item(s)
-                  </p>
+                <div className="flex items-center gap-3">
+                  <Badge tone={ORDER_STATUS_TONE[order.status] ?? "default"}>
+                    {ORDER_STATUS_LABELS[order.status]}
+                  </Badge>
+                  <span className="hidden font-mono text-sm font-semibold text-ink sm:block">
+                    {formatCurrency(order.total)}
+                  </span>
+                  <ChevronRight size={16} className="text-ink-soft" />
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge tone={ORDER_STATUS_TONE[order.status] ?? "default"}>
-                  {ORDER_STATUS_LABELS[order.status]}
-                </Badge>
-                <span className="hidden font-mono text-sm font-semibold text-ink sm:block">
-                  {formatCurrency(order.total)}
-                </span>
-                <ChevronRight size={16} className="text-ink-soft" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+              </Link>
+            ))}
+          </motion.div>
+        )}
 
-      {tab === "returns" && (
-        <div className="space-y-3">
-          {returns.length === 0 && (
-            <EmptyState
-              label="No return requests"
-              hint="Request a return from any delivered order's detail page."
-            />
-          )}
-          {returns.map((ret) => (
-            <div
-              key={ret.id}
-              className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-surface-soft">
-                  {ret.item_image && (
-                    <Image src={ret.item_image} alt="" fill sizes="48px" className="object-cover" />
-                  )}
+        {tab === "returns" && (
+          <motion.div
+            key="returns"
+            variants={withReducedMotion(fadeUp, reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="space-y-3"
+          >
+            {returns.length === 0 && (
+              <EmptyState
+                label="No return requests"
+                hint="Request a return from any delivered order's detail page."
+              />
+            )}
+            {returns.map((ret) => (
+              <div
+                key={ret.id}
+                className="flex items-center justify-between gap-4 rounded-card border border-line bg-surface p-4 shadow-card"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="relative h-12 w-12 overflow-hidden rounded-panel bg-surface-soft">
+                    {ret.item_image && (
+                      <Image src={ret.item_image} alt="" fill sizes="48px" className="object-cover" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-ink">{ret.item_name}</p>
+                    <p className="text-xs text-ink-soft">
+                      {ret.return_number} · Order {ret.order_number} · {formatDate(ret.created_at)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-ink">{ret.item_name}</p>
-                  <p className="text-xs text-ink-soft">
-                    {ret.return_number} · Order {ret.order_number} · {formatDate(ret.created_at)}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <span className="hidden font-mono text-sm text-ink sm:block">
+                    {formatCurrency(ret.refund_amount)}
+                  </span>
+                  <Badge tone={RETURN_STATUS_TONE[ret.status] ?? "default"}>
+                    {RETURN_STATUS_LABELS[ret.status]}
+                  </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="hidden font-mono text-sm text-ink sm:block">
-                  {formatCurrency(ret.refund_amount)}
-                </span>
-                <Badge tone={RETURN_STATUS_TONE[ret.status] ?? "default"}>
-                  {RETURN_STATUS_LABELS[ret.status]}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </motion.div>
+        )}
 
-      {tab === "addresses" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {addresses.length === 0 && (
-            <EmptyState
-              label="No saved addresses"
-              hint="Addresses you use at checkout will be saved here."
-            />
-          )}
-          {addresses.map((addr) => (
-            <div key={addr.id} className="rounded-2xl border border-line bg-surface p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-ink">{addr.full_name}</p>
-                {addr.is_default === 1 && <Badge tone="primary">Default</Badge>}
+        {tab === "addresses" && (
+          <motion.div
+            key="addresses"
+            variants={withReducedMotion(fadeUp, reduced)}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="grid gap-3 sm:grid-cols-2"
+          >
+            {addresses.length === 0 && (
+              <EmptyState
+                label="No saved addresses"
+                hint="Addresses you use at checkout will be saved here."
+              />
+            )}
+            {addresses.map((addr) => (
+              <div key={addr.id} className="rounded-card border border-line bg-surface p-4 shadow-card">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">{addr.full_name}</p>
+                  {addr.is_default === 1 && <Badge tone="primary">Default</Badge>}
+                </div>
+                <p className="mt-1 text-sm text-ink-soft">{addr.phone}</p>
+                <p className="mt-2 text-sm text-ink-soft">
+                  {addr.line1}, {addr.city}, {addr.state} {addr.postal_code}
+                </p>
               </div>
-              <p className="mt-1 text-sm text-ink-soft">{addr.phone}</p>
-              <p className="mt-2 text-sm text-ink-soft">
-                {addr.line1}, {addr.city}, {addr.state} {addr.postal_code}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 function EmptyState({ label, hint }: { label: string; hint: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line py-14 text-center">
+    <div className="rounded-card border border-dashed border-line py-14 text-center">
       <p className="font-display text-base text-ink">{label}</p>
       <p className="mt-1 text-sm text-ink-soft">{hint}</p>
     </div>

@@ -4,9 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Pencil, Trash2, Search } from "lucide-react";
+import { Pencil, Trash2, Search, Package } from "lucide-react";
 import type { Product, Category } from "@/types";
 import { Badge } from "@/components/ui/primitives";
+import { EmptyState } from "@/components/ui/empty-state";
+import { confirmAction } from "@/store/confirm";
+import { pushToast } from "@/store/toast";
 import { formatCurrency, PRODUCT_TYPE_LABELS, cn } from "@/lib/utils";
 
 export function ProductsTable({
@@ -39,11 +42,21 @@ export function ProductsTable({
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this product? This cannot be undone.")) return;
+  async function handleDelete(id: string, name: string) {
+    const confirmed = await confirmAction({
+      title: `Delete "${name}"?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
     setDeletingId(id);
-    await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      pushToast({ title: "Could not delete product", tone: "warning" });
+      return;
+    }
+    pushToast({ title: "Product deleted", tone: "success" });
     router.refresh();
   }
 
@@ -66,6 +79,18 @@ export function ProductsTable({
       </form>
 
       <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+        {products.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No products found"
+            description={
+              query
+                ? `Nothing matches "${query}". Try a different search.`
+                : "Add your first product to get started."
+            }
+            className="border-none"
+          />
+        ) : (
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs text-ink-soft">
@@ -116,7 +141,7 @@ export function ProductsTable({
                       <Pencil size={14} />
                     </Link>
                     <button
-                      onClick={() => handleDelete(p.id)}
+                      onClick={() => handleDelete(p.id, p.name)}
                       disabled={deletingId === p.id}
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-danger hover:bg-danger/10 disabled:opacity-50"
                     >
@@ -128,6 +153,7 @@ export function ProductsTable({
             ))}
           </tbody>
         </table>
+        )}
       </div>
 
       {totalPages > 1 && (

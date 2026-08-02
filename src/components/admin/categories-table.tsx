@@ -6,6 +6,8 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import type { Category } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/primitives";
+import { confirmAction } from "@/store/confirm";
+import { pushToast } from "@/store/toast";
 
 type CategoryRow = Category & { product_count: number };
 
@@ -82,18 +84,30 @@ export function CategoriesTable({ categories }: { categories: CategoryRow[] }) {
 
   async function handleDelete(c: CategoryRow) {
     if (c.product_count > 0) {
-      alert(
-        `"${c.name}" has ${c.product_count} product(s) assigned. Move or delete them before removing this category.`
-      );
+      pushToast({
+        title: "Can't delete this category",
+        description: `"${c.name}" has ${c.product_count} product(s) assigned. Move or delete them first.`,
+        tone: "warning",
+      });
       return;
     }
-    if (!confirm(`Delete category "${c.name}"? This cannot be undone.`)) return;
+    const confirmed = await confirmAction({
+      title: `Delete "${c.name}"?`,
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/admin/categories/${c.id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "Could not delete category.");
+      pushToast({
+        title: "Could not delete category",
+        description: data.error,
+        tone: "warning",
+      });
       return;
     }
+    pushToast({ title: "Category deleted", tone: "success" });
     router.refresh();
   }
 

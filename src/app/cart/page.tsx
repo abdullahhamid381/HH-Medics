@@ -2,20 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCart, cartSubtotal } from "@/store/cart";
 import { formatCurrency } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
+import { fadeIn, fadeUp, staggerContainer, withReducedMotion } from "@/lib/motion";
 
 export default function CartPage() {
   const lines = useCart((s) => s.lines);
   const setQuantity = useCart((s) => s.setQuantity);
   const removeItem = useCart((s) => s.removeItem);
   const subtotal = cartSubtotal(lines);
+  const reduced = !!useReducedMotion();
 
   if (lines.length === 0) {
     return (
-      <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-24 text-center">
+      <motion.div
+        variants={withReducedMotion(fadeIn, reduced)}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-24 text-center"
+      >
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-soft text-ink-soft">
           <ShoppingBag size={28} />
         </div>
@@ -25,7 +33,7 @@ export default function CartPage() {
           started.
         </p>
         <LinkButton href="/shop">Start shopping</LinkButton>
-      </div>
+      </motion.div>
     );
   }
 
@@ -36,13 +44,22 @@ export default function CartPage() {
       </h1>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <motion.div
+          variants={withReducedMotion(staggerContainer, reduced)}
+          initial="hidden"
+          animate="visible"
+          className="space-y-4 lg:col-span-2"
+        >
+          <AnimatePresence initial={false}>
           {lines.map((line) => (
-            <div
+            <motion.div
               key={line.productId}
-              className="flex gap-4 rounded-2xl border border-line bg-surface p-4"
+              layout
+              variants={withReducedMotion(fadeUp, reduced)}
+              exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0, marginBottom: 0, overflow: "hidden" }}
+              className="flex gap-4 rounded-card border border-line bg-surface p-4 shadow-card"
             >
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-soft">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-panel bg-surface-soft">
                 {line.image && (
                   <Image
                     src={line.image}
@@ -95,11 +112,12 @@ export default function CartPage() {
                   </span>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+          </AnimatePresence>
+        </motion.div>
 
-        <div className="h-fit rounded-2xl border border-line bg-surface p-6">
+        <div className="h-fit rounded-card border border-line bg-surface p-6 shadow-card">
           <h2 className="font-display text-lg text-ink">Order summary</h2>
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between text-ink-soft">

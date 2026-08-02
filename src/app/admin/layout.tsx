@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminMobileNav } from "@/components/admin/mobile-nav";
 import { AdminRealtimeListener } from "@/components/admin/realtime-listener";
+import { ConfirmDialogHost } from "@/components/ui/confirm-dialog";
+import { AdminCommandPalette } from "@/components/admin/command-palette";
 
 export default async function AdminLayout({
   children,
@@ -17,6 +19,8 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-[calc(100vh-4rem)]">
       <AdminRealtimeListener />
+      <ConfirmDialogHost />
+      <AdminCommandPalette />
       <AdminSidebar />
       <div className="flex-1">
         <AdminMobileNav />

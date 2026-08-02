@@ -1,12 +1,15 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Star, ChevronRight } from "lucide-react";
 import { getProductBySlug, getRelatedProducts } from "@/lib/db/products";
 import { AddToCartWidget } from "@/components/site/add-to-cart-widget";
 import { ProductCard } from "@/components/site/product-card";
+import { ProductGallery } from "@/components/site/product-gallery";
+import { WishlistButton } from "@/components/site/wishlist-button";
+import { RecordProductView } from "@/components/site/record-product-view";
 import { Badge } from "@/components/ui/primitives";
 import { formatCurrency, PRODUCT_TYPE_LABELS } from "@/lib/utils";
+import { AnimatedGrid, AnimatedItem, AnimatedSection } from "@/components/site/animated-section";
 
 export default async function ProductPage({
   params,
@@ -25,6 +28,7 @@ export default async function ProductPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <RecordProductView product={product} />
       <div className="mb-6 flex items-center gap-1.5 text-xs text-ink-soft">
         <Link href="/shop" className="hover:text-primary">
           Shop
@@ -45,34 +49,11 @@ export default async function ProductPage({
       </div>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div className="space-y-3">
-          <div className="label-notch relative aspect-square overflow-hidden rounded-[1.5rem] border border-line bg-surface">
-            {gallery[0] && (
-              <Image
-                src={gallery[0]}
-                alt={product.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-            )}
-          </div>
-          {gallery.length > 1 && (
-            <div className="flex gap-3">
-              {gallery.slice(1).map((img, i) => (
-                <div
-                  key={i}
-                  className="relative h-20 w-20 overflow-hidden rounded-xl border border-line bg-surface"
-                >
-                  <Image src={img} alt="" fill sizes="80px" className="object-cover" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AnimatedSection variant="fadeIn">
+          <ProductGallery images={gallery} name={product.name} />
+        </AnimatedSection>
 
-        <div>
+        <AnimatedSection>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="primary">
               {PRODUCT_TYPE_LABELS[product.type] ?? product.type}
@@ -124,8 +105,9 @@ export default async function ProductPage({
             {product.short_description}
           </p>
 
-          <div className="my-6">
+          <div className="my-6 space-y-3">
             <AddToCartWidget product={product} />
+            <WishlistButton product={product} />
           </div>
 
           <div className="label-perforation" />
@@ -152,7 +134,7 @@ export default async function ProductPage({
               </div>
             </dl>
           </div>
-        </div>
+        </AnimatedSection>
       </div>
 
       {related.length > 0 && (
@@ -160,11 +142,13 @@ export default async function ProductPage({
           <h2 className="mb-6 font-display text-2xl text-ink">
             You might also like
           </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {related.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <AnimatedItem key={p.id} className="flex">
+                <ProductCard product={p} />
+              </AnimatedItem>
             ))}
-          </div>
+          </AnimatedGrid>
         </div>
       )}
     </div>

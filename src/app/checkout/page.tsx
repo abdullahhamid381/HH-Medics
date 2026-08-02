@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Tag, Banknote, CreditCard, ShieldCheck } from "lucide-react";
 import { useCart, cartSubtotal } from "@/store/cart";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const reduced = !!useReducedMotion();
 
   const discount = Math.round((subtotal * discountPercent) / 100);
   const shippingFee = subtotal - discount > 3000 ? 0 : 200;
@@ -111,7 +113,7 @@ export default function CheckoutPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <section className="rounded-2xl border border-line bg-surface p-6">
+          <section className="rounded-card border border-line bg-surface p-6 shadow-card">
             <h2 className="mb-4 font-display text-lg text-ink">
               Delivery details
             </h2>
@@ -178,7 +180,7 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-line bg-surface p-6">
+          <section className="rounded-card border border-line bg-surface p-6 shadow-card">
             <h2 className="mb-4 font-display text-lg text-ink">
               Payment method
             </h2>
@@ -187,14 +189,19 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={() => setPaymentMethod("cod")}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl border p-4 text-left transition",
-                  paymentMethod === "cod"
-                    ? "border-primary bg-primary-soft"
-                    : "border-line hover:bg-surface-soft"
+                  "relative flex items-center gap-3 overflow-hidden rounded-panel border p-4 text-left transition",
+                  paymentMethod === "cod" ? "border-primary" : "border-line hover:bg-surface-soft"
                 )}
               >
-                <Banknote size={20} className="text-primary" />
-                <div>
+                {paymentMethod === "cod" && (
+                  <motion.div
+                    layoutId="checkout-payment-active-bg"
+                    className="absolute inset-0 bg-primary-soft"
+                    transition={reduced ? { duration: 0.01 } : { type: "spring", damping: 30, stiffness: 300 }}
+                  />
+                )}
+                <Banknote size={20} className="relative z-10 text-primary" />
+                <div className="relative z-10">
                   <p className="text-sm font-medium text-ink">Cash on delivery</p>
                   <p className="text-xs text-ink-soft">Pay when your order arrives</p>
                 </div>
@@ -203,48 +210,63 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={() => setPaymentMethod("card")}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl border p-4 text-left transition",
-                  paymentMethod === "card"
-                    ? "border-primary bg-primary-soft"
-                    : "border-line hover:bg-surface-soft"
+                  "relative flex items-center gap-3 overflow-hidden rounded-panel border p-4 text-left transition",
+                  paymentMethod === "card" ? "border-primary" : "border-line hover:bg-surface-soft"
                 )}
               >
-                <CreditCard size={20} className="text-primary" />
-                <div>
+                {paymentMethod === "card" && (
+                  <motion.div
+                    layoutId="checkout-payment-active-bg"
+                    className="absolute inset-0 bg-primary-soft"
+                    transition={reduced ? { duration: 0.01 } : { type: "spring", damping: 30, stiffness: 300 }}
+                  />
+                )}
+                <CreditCard size={20} className="relative z-10 text-primary" />
+                <div className="relative z-10">
                   <p className="text-sm font-medium text-ink">Credit / debit card</p>
                   <p className="text-xs text-ink-soft">Simulated for this demo</p>
                 </div>
               </button>
             </div>
 
-            {paymentMethod === "card" && (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <Label>Card number</Label>
-                  <Input placeholder="4242 4242 4242 4242" maxLength={19} />
-                </div>
-                <div>
-                  <Label>Expiry</Label>
-                  <Input placeholder="MM/YY" maxLength={5} />
-                </div>
-                <div>
-                  <Label>CVC</Label>
-                  <Input placeholder="123" maxLength={3} />
-                </div>
-                <p className="flex items-center gap-1.5 text-xs text-ink-soft sm:col-span-2">
-                  <ShieldCheck size={13} /> No real payment is processed in this demo.
-                </p>
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {paymentMethod === "card" && (
+                <motion.div
+                  initial={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  animate={reduced ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+                  exit={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Label>Card number</Label>
+                      <Input placeholder="4242 4242 4242 4242" maxLength={19} />
+                    </div>
+                    <div>
+                      <Label>Expiry</Label>
+                      <Input placeholder="MM/YY" maxLength={5} />
+                    </div>
+                    <div>
+                      <Label>CVC</Label>
+                      <Input placeholder="123" maxLength={3} />
+                    </div>
+                    <p className="flex items-center gap-1.5 text-xs text-ink-soft sm:col-span-2">
+                      <ShieldCheck size={13} /> No real payment is processed in this demo.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
         </div>
 
-        <div className="h-fit space-y-4 rounded-2xl border border-line bg-surface p-6">
+        <div className="h-fit space-y-4 rounded-card border border-line bg-surface p-6 shadow-card">
           <h2 className="font-display text-lg text-ink">Order summary</h2>
           <div className="max-h-64 space-y-3 overflow-y-auto">
             {lines.map((l) => (
               <div key={l.productId} className="flex items-center gap-3">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-soft">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-panel bg-surface-soft">
                   {l.image && (
                     <Image src={l.image} alt={l.name} fill sizes="56px" className="object-cover" />
                   )}

@@ -95,14 +95,27 @@ export function Label({
 export function Card({
   children,
   className,
+  padding = "none",
+  interactive = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  padding?: "none" | "sm" | "md" | "lg";
+  interactive?: boolean;
 }) {
+  const paddings: Record<string, string> = {
+    none: "",
+    sm: "p-4",
+    md: "p-6",
+    lg: "p-8",
+  };
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-card)] border border-line bg-surface",
+        "rounded-card border border-line bg-surface shadow-card",
+        paddings[padding],
+        interactive &&
+          "transition-shadow duration-200 hover:shadow-elevated",
         className
       )}
     >

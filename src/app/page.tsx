@@ -1,16 +1,31 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Truck, BadgeCheck, Star } from "lucide-react";
-import { listCategories, listProducts } from "@/lib/db/products";
+import { ArrowRight, ShieldCheck, Truck, BadgeCheck, Star, Award, Sparkles } from "lucide-react";
+import { listCategories, listProducts, listBrands } from "@/lib/db/products";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { ProductCard } from "@/components/site/product-card";
 import { LinkButton } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { AnimatedGrid, AnimatedItem, AnimatedSection } from "@/components/site/animated-section";
+import { RecentlyViewedSection } from "@/components/site/recently-viewed-section";
+import { TestimonialsSection } from "@/components/site/testimonials-section";
+import { FaqSection } from "@/components/site/faq-section";
+import { NewsletterSection } from "@/components/site/newsletter-section";
+import { PromoBanners } from "@/components/site/promo-banners";
+
+const CERTIFICATIONS = [
+  { icon: ShieldCheck, label: "Licensed pharmacy partners" },
+  { icon: Award, label: "GMP-certified suppliers only" },
+  { icon: BadgeCheck, label: "Pharmacist-verified listings" },
+  { icon: Sparkles, label: "Authenticity guaranteed" },
+];
 
 export default async function HomePage() {
   const categories = await listCategories();
   const { items: featured } = await listProducts({ featured: true, limit: 8 });
   const { items: newest } = await listProducts({ sort: "newest", limit: 8 });
+  const { items: bestSellers } = await listProducts({ sort: "rating", limit: 8 });
+  const brands = await listBrands(8);
   const heroProduct = featured[0];
 
   return (
@@ -49,8 +64,8 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md">
-            <div className="label-notch overflow-hidden rounded-[1.5rem] border border-line bg-bg p-5 shadow-xl shadow-black/5">
+          <AnimatedSection className="relative mx-auto w-full max-w-md">
+            <div className="label-notch overflow-hidden rounded-hero border border-line bg-bg p-5 shadow-elevated">
               <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-ink-soft">
                 <span>Rx / OTC · Verified</span>
                 <span>No. {heroProduct?.sku ?? "SKU-1000"}</span>
@@ -87,9 +102,22 @@ export default async function HomePage() {
             </div>
             <div className="absolute -right-6 -top-6 -z-10 h-32 w-32 rounded-full bg-accent-soft blur-2xl" />
             <div className="absolute -bottom-8 -left-8 -z-10 h-40 w-40 rounded-full bg-primary-soft blur-2xl" />
+          </AnimatedSection>
+        </div>
+
+        <div className="border-t border-line bg-bg">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-4 py-4 sm:px-6 lg:px-8">
+            {CERTIFICATIONS.map((c) => (
+              <div key={c.label} className="flex items-center gap-2 text-xs font-medium text-ink-soft">
+                <c.icon size={14} className="text-primary" />
+                {c.label}
+              </div>
+            ))}
           </div>
         </div>
       </section>
+
+      <PromoBanners />
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end justify-between">
@@ -98,30 +126,79 @@ export default async function HomePage() {
               Browse by aisle
             </p>
             <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
-              Shop by category
+              Popular Categories
             </h2>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {categories.map((cat) => {
             const Icon = getCategoryIcon(cat.icon);
             return (
-              <Link
-                key={cat.id}
-                href={`/shop?category=${cat.slug}`}
-                className="group flex flex-col items-start gap-3 rounded-2xl border border-line bg-surface p-5 transition hover:border-primary/40 hover:shadow-md hover:shadow-black/5"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary transition group-hover:bg-primary group-hover:text-white">
-                  <Icon size={20} />
-                </span>
-                <span className="font-display text-[15px] text-ink">
-                  {cat.name}
-                </span>
-                <span className="text-xs text-ink-soft">{cat.description}</span>
-              </Link>
+              <AnimatedItem key={cat.id}>
+                <Link
+                  href={`/shop?category=${cat.slug}`}
+                  className="group flex h-full flex-col items-start gap-3 rounded-card border border-line bg-surface p-5 shadow-card transition hover:border-primary/40 hover:shadow-elevated"
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-panel bg-primary-soft text-primary transition group-hover:bg-primary group-hover:text-white">
+                    <Icon size={20} />
+                  </span>
+                  <span className="font-display text-[15px] text-ink">
+                    {cat.name}
+                  </span>
+                  <span className="text-xs text-ink-soft">{cat.description}</span>
+                </Link>
+              </AnimatedItem>
             );
           })}
+        </AnimatedGrid>
+      </section>
+
+      {brands.length > 0 && (
+        <section className="border-y border-line bg-surface py-10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <p className="mb-5 text-center font-mono text-xs uppercase tracking-wider text-ink-soft">
+              Shop by brand
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {brands.map((b) => (
+                <Link
+                  key={b.brand}
+                  href={`/shop?q=${encodeURIComponent(b.brand)}`}
+                  className="rounded-full border border-line bg-bg px-4 py-2 text-sm font-medium text-ink-soft transition hover:border-primary/40 hover:text-primary"
+                >
+                  {b.brand}
+                  <span className="ml-1.5 text-xs text-ink-soft/70">({b.count})</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-wider text-primary">
+              Staff picks
+            </p>
+            <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
+              Health Products
+            </h2>
+          </div>
+          <Link
+            href="/shop"
+            className="hidden items-center gap-1 text-sm font-medium text-primary hover:underline sm:flex"
+          >
+            View all <ArrowRight size={15} />
+          </Link>
         </div>
+        <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {featured.map((p) => (
+            <AnimatedItem key={p.id} className="flex">
+              <ProductCard product={p} />
+            </AnimatedItem>
+          ))}
+        </AnimatedGrid>
       </section>
 
       <section className="border-y border-line bg-surface py-14">
@@ -129,24 +206,20 @@ export default async function HomePage() {
           <div className="mb-8 flex items-end justify-between">
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-primary">
-                Staff picks
+                Highest rated
               </p>
               <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
-                Featured this week
+                Trending Products
               </h2>
             </div>
-            <Link
-              href="/shop"
-              className="hidden items-center gap-1 text-sm font-medium text-primary hover:underline sm:flex"
-            >
-              View all <ArrowRight size={15} />
-            </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {featured.map((p) => (
-              <ProductCard key={p.id} product={p} />
+          <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {bestSellers.map((p) => (
+              <AnimatedItem key={p.id} className="flex">
+                <ProductCard product={p} />
+              </AnimatedItem>
             ))}
-          </div>
+          </AnimatedGrid>
         </div>
       </section>
 
@@ -161,15 +234,22 @@ export default async function HomePage() {
             </h2>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {newest.map((p) => (
-            <ProductCard key={p.id} product={p} />
+            <AnimatedItem key={p.id}>
+              <ProductCard product={p} />
+            </AnimatedItem>
           ))}
-        </div>
+        </AnimatedGrid>
       </section>
 
+      <RecentlyViewedSection />
+      <TestimonialsSection />
+      <FaqSection />
+      <NewsletterSection />
+
       <section id="contact" className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="label-notch overflow-hidden rounded-[1.75rem] border border-line bg-primary px-8 py-12 text-center text-white sm:px-16">
+        <AnimatedSection variant="fadeIn" className="label-notch overflow-hidden rounded-hero border border-line bg-primary px-8 py-12 text-center text-white sm:px-16">
           <h2 className="font-display text-2xl sm:text-3xl">
             Questions about a product or your order?
           </h2>
@@ -185,7 +265,7 @@ export default async function HomePage() {
           >
             Go to my account
           </LinkButton>
-        </div>
+        </AnimatedSection>
       </section>
     </div>
   );

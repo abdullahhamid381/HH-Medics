@@ -4,10 +4,12 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Mail, Lock, User as UserIcon, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 import { GoogleGlyph } from "@/components/ui/google-glyph";
+import { fadeUp, withReducedMotion } from "@/lib/motion";
 
 export function SignupForm({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
@@ -20,6 +22,7 @@ export function SignupForm({ googleEnabled }: { googleEnabled: boolean }) {
   const [otp, setOtp] = useState("");
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const reduced = !!useReducedMotion();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

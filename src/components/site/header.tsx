@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Search,
   ShoppingBag,
@@ -16,10 +17,13 @@ import {
   Package,
   LogOut,
   ChevronDown,
+  Heart,
 } from "lucide-react";
 import { useCart, cartCount } from "@/store/cart";
+import { useWishlist } from "@/store/wishlist";
 import { useTheme } from "@/components/providers/theme-provider";
 import { cn } from "@/lib/utils";
+import { scaleIn, withReducedMotion } from "@/lib/motion";
 
 const NAV_LINKS = [
   { label: "Medicines", href: "/shop?category=medicines" },
@@ -34,6 +38,7 @@ export function Header() {
   const { theme, toggle } = useTheme();
   const lines = useCart((s) => s.lines);
   const openCart = useCart((s) => s.open);
+  const wishlistCount = useWishlist((s) => s.lines.length);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -41,6 +46,7 @@ export function Header() {
   const router = useRouter();
   const accountRef = useRef<HTMLDivElement>(null);
   const count = cartCount(lines);
+  const reduced = !!useReducedMotion();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -85,7 +91,7 @@ export function Header() {
             +
           </span>
           <span className="font-display text-xl tracking-tight text-ink">
-            Medi<span className="text-primary">Store</span>
+            HH <span className="text-primary">Medics</span>
           </span>
         </Link>
 
@@ -103,7 +109,7 @@ export function Header() {
 
         <form
           onSubmit={handleSearch}
-          className="ml-auto hidden max-w-sm flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 md:flex"
+          className="ml-auto hidden max-w-sm flex-1 items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 shadow-card transition-shadow focus-within:shadow-elevated md:flex"
         >
           <Search size={16} className="text-ink-soft" />
           <input
@@ -123,17 +129,48 @@ export function Header() {
             {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
           </button>
 
+          <Link
+            href="/wishlist"
+            className="relative hidden rounded-full p-2.5 text-ink-soft transition hover:bg-surface-soft hover:text-ink sm:block"
+            aria-label="Wishlist"
+          >
+            <Heart size={19} />
+            <AnimatePresence>
+              {wishlistCount > 0 && (
+                <motion.span
+                  key={wishlistCount}
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={reduced ? { duration: 0.01 } : { type: "spring", damping: 15, stiffness: 300 }}
+                  className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white"
+                >
+                  {wishlistCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Link>
+
           <button
             onClick={openCart}
             className="relative rounded-full p-2.5 text-ink-soft transition hover:bg-surface-soft hover:text-ink"
             aria-label="Open cart"
           >
             <ShoppingBag size={19} />
-            {count > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
-                {count}
-              </span>
-            )}
+            <AnimatePresence>
+              {count > 0 && (
+                <motion.span
+                  key={count}
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={reduced ? { duration: 0.01 } : { type: "spring", damping: 15, stiffness: 300 }}
+                  className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white"
+                >
+                  {count}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
 
           <div className="relative" ref={accountRef}>
@@ -146,8 +183,16 @@ export function Header() {
               <ChevronDown size={14} className="hidden sm:block" />
             </button>
 
-            {accountOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-surface py-1.5 shadow-lg shadow-black/5">
+            <AnimatePresence>
+              {accountOpen && (
+                <motion.div
+                  variants={withReducedMotion(scaleIn, reduced)}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  style={{ transformOrigin: "top right" }}
+                  className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-panel border border-line bg-surface py-1.5 shadow-elevated"
+                >
                 {session?.user ? (
                   <>
                     <div className="border-b border-line px-4 py-3">
@@ -199,37 +244,60 @@ export function Header() {
                     </Link>
                   </div>
                 )}
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {mobileOpen && (
-        <div className="border-t border-line bg-bg px-4 pb-4 pt-2 lg:hidden">
-          <form onSubmit={handleSearch} className="mb-3 flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5">
-            <Search size={16} className="text-ink-soft" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search products..."
-              className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft/60"
-            />
-          </form>
-          <nav className="flex flex-col gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-xl px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-soft"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      )}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={reduced ? { duration: 0.01 } : { duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden border-t border-line bg-bg lg:hidden"
+          >
+            <div className="px-4 pb-4 pt-2">
+              <form onSubmit={handleSearch} className="mb-3 flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2.5">
+                <Search size={16} className="text-ink-soft" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search products..."
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft/60"
+                />
+              </form>
+              <nav className="flex flex-col gap-1">
+                <Link
+                  href="/wishlist"
+                  className="flex items-center gap-2 rounded-panel px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-soft"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Heart size={15} /> Wishlist
+                  {wishlistCount > 0 && (
+                    <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+                {NAV_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-panel px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-soft"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

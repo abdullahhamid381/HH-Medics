@@ -33,7 +33,7 @@ export function AddToCartWidget({ product }: { product: Product }) {
   return (
     <div className="space-y-4">
       {product.requires_prescription === 1 && (
-        <div className="flex items-start gap-2.5 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+        <div className="flex items-start gap-2.5 rounded-panel bg-warning/10 px-4 py-3 text-sm text-warning">
           <Stethoscope size={17} className="mt-0.5 shrink-0" />
           <span>
             This is a prescription medicine. Our pharmacist will verify your

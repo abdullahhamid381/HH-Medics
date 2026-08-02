@@ -2,9 +2,11 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SlidersHorizontal, X } from "lucide-react";
 import type { Category } from "@/types";
 import { cn } from "@/lib/utils";
+import { scaleIn, withReducedMotion } from "@/lib/motion";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest" },
@@ -28,6 +30,7 @@ export function ShopFilters({ categories }: { categories: Category[] }) {
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const reduced = !!useReducedMotion();
 
   useEffect(() => {
     setQ(searchParams.get("q") ?? "");
@@ -60,12 +63,12 @@ export function ShopFilters({ categories }: { categories: Category[] }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search products..."
-            className="h-11 w-full rounded-full border border-line bg-surface px-4 text-sm outline-none focus:border-primary"
+            className="h-11 w-full rounded-full border border-line bg-surface px-4 text-sm shadow-card outline-none transition-shadow focus:border-primary focus:shadow-elevated"
           />
         </form>
         <button
           onClick={() => setMobileOpen((v) => !v)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink-soft"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-card transition hover:bg-surface-soft"
         >
           <SlidersHorizontal size={18} />
         </button>
@@ -78,7 +81,7 @@ export function ShopFilters({ categories }: { categories: Category[] }) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search medicines, serums, vitamins..."
-              className="h-11 w-full max-w-md rounded-full border border-line bg-surface px-4 text-sm outline-none focus:border-primary"
+              className="h-11 w-full max-w-md rounded-full border border-line bg-surface px-4 text-sm shadow-card outline-none transition-shadow focus:border-primary focus:shadow-elevated"
             />
           </form>
         </div>
@@ -142,18 +145,24 @@ export function ShopFilters({ categories }: { categories: Category[] }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {hasActiveFilters && (
-              <button
-                onClick={() => router.push(pathname)}
-                className="flex items-center gap-1 text-xs text-ink-soft hover:text-danger"
-              >
-                <X size={13} /> Clear
-              </button>
-            )}
+            <AnimatePresence>
+              {hasActiveFilters && (
+                <motion.button
+                  variants={withReducedMotion(scaleIn, reduced)}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  onClick={() => router.push(pathname)}
+                  className="flex items-center gap-1 text-xs text-ink-soft hover:text-danger"
+                >
+                  <X size={13} /> Clear
+                </motion.button>
+              )}
+            </AnimatePresence>
             <select
               value={activeSort}
               onChange={(e) => updateParam("sort", e.target.value)}
-              className="h-9 rounded-full border border-line bg-surface px-3 text-xs outline-none focus:border-primary"
+              className="h-9 rounded-full border border-line bg-surface px-3 text-xs shadow-card outline-none focus:border-primary"
             >
               {SORT_OPTIONS.map((s) => (
                 <option key={s.value} value={s.value}>

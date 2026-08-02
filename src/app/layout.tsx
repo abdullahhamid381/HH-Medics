@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import "@fontsource/fraunces/400.css";
-import "@fontsource/fraunces/500.css";
-import "@fontsource/fraunces/600.css";
-import "@fontsource/fraunces/700.css";
-import "@fontsource/inter/400.css";
-import "@fontsource/inter/500.css";
-import "@fontsource/inter/600.css";
-import "@fontsource/inter/700.css";
+import "@fontsource/plus-jakarta-sans/400.css";
+import "@fontsource/plus-jakarta-sans/500.css";
+import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource/plus-jakarta-sans/700.css";
+import "@fontsource/open-sans/400.css";
+import "@fontsource/open-sans/500.css";
+import "@fontsource/open-sans/600.css";
+import "@fontsource/open-sans/700.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/600.css";
@@ -15,10 +15,11 @@ import { Providers } from "@/components/providers";
 import { Header } from "@/components/site/header";
 import { Footer } from "@/components/site/footer";
 import { CartDrawer } from "@/components/site/cart-drawer";
+import { QuickViewModal } from "@/components/site/quick-view-modal";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "MediStore — Medicines, Supplements & Skincare",
+  title: "HH Medics — Medicines, Supplements & Skincare",
   description:
     "Shop medicines, supplements, face wash, serums and cosmetics online — verified products, fast delivery, and clear labeling on everything.",
 };
@@ -34,6 +35,7 @@ export default function RootLayout({
         <Providers>
           <Header />
           <CartDrawer />
+          <QuickViewModal />
           <main className="flex-1">{children}</main>
           <Footer />
           <Toaster />

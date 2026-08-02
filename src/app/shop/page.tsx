@@ -4,6 +4,7 @@ import { ProductCard } from "@/components/site/product-card";
 import { ShopFilters } from "@/components/site/shop-filters";
 import { cn } from "@/lib/utils";
 import { PackageSearch } from "lucide-react";
+import { AnimatedGrid, AnimatedItem } from "@/components/site/animated-section";
 
 const PAGE_SIZE = 12;
 
@@ -51,7 +52,7 @@ export default async function ShopPage({
       <ShopFilters categories={categories} />
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line py-20 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-line py-20 text-center">
           <PackageSearch size={32} className="text-ink-soft" />
           <p className="font-display text-lg text-ink">No products found</p>
           <p className="max-w-xs text-sm text-ink-soft">
@@ -64,11 +65,13 @@ export default async function ShopPage({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <AnimatedGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <AnimatedItem key={p.id} className="flex">
+                <ProductCard product={p} />
+              </AnimatedItem>
             ))}
-          </div>
+          </AnimatedGrid>
 
           {totalPages > 1 && (
             <div className="mt-10 flex items-center justify-center gap-1.5">

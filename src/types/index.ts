@@ -150,3 +150,63 @@ export interface User {
   otp_expires_at: string | null;
   created_at: string;
 }
+
+export interface Banner {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  image: string;
+  link_href: string | null;
+  cta_label: string | null;
+  sort_order: number;
+  active: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+export type ContentStatus = "draft" | "published";
+
+export interface CmsPage {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  status: ContentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string;
+  cover_image: string | null;
+  author: string | null;
+  status: ContentStatus;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Faq {
+  id: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  active: number;
+  created_at: string;
+}
+
+export interface Testimonial {
+  id: string;
+  author_name: string;
+  author_detail: string | null;
+  quote: string;
+  rating: number;
+  sort_order: number;
+  active: number;
+  created_at: string;
+}

@@ -7,11 +7,11 @@ import { listReturnsForUser } from "@/lib/db/returns";
 import { Badge } from "@/components/ui/primitives";
 import { ReturnRequestForm } from "@/components/site/return-request-form";
 import { OrderTrackingListener } from "@/components/site/order-tracking-listener";
+import { OrderStatusStepper } from "@/components/site/order-status-stepper";
 import {
   formatCurrency,
   formatDate,
   ORDER_STATUS_LABELS,
-  cn,
 } from "@/lib/utils";
 
 const STATUS_STEPS = ["pending", "processing", "shipped", "delivered"];
@@ -41,7 +41,7 @@ export default async function OrderDetailPage({
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
       <OrderTrackingListener orderId={order.id} />
       {placed && (
-        <div className="mb-6 flex items-center gap-2.5 rounded-2xl bg-primary-soft px-5 py-4 text-primary-strong">
+        <div className="mb-6 flex items-center gap-2.5 rounded-card bg-primary-soft px-5 py-4 text-primary-strong">
           <CheckCircle2 size={20} />
           <div>
             <p className="font-medium">Order placed successfully!</p>
@@ -68,41 +68,15 @@ export default async function OrderDetailPage({
       </div>
 
       {order.status !== "cancelled" && (
-        <div className="mb-10 flex items-center">
-          {STATUS_STEPS.map((step, i) => (
-            <div key={step} className="flex flex-1 items-center last:flex-none">
-              <div className="flex flex-col items-center gap-1.5">
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold",
-                    i <= currentStepIndex
-                      ? "border-primary bg-primary text-white"
-                      : "border-line text-ink-soft"
-                  )}
-                >
-                  {i + 1}
-                </div>
-                <span className="text-[11px] capitalize text-ink-soft">{step}</span>
-              </div>
-              {i < STATUS_STEPS.length - 1 && (
-                <div
-                  className={cn(
-                    "mx-2 h-0.5 flex-1",
-                    i < currentStepIndex ? "bg-primary" : "bg-line"
-                  )}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+        <OrderStatusStepper steps={STATUS_STEPS} currentStepIndex={currentStepIndex} />
       )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
           {order.items?.map((item) => (
-            <div key={item.id} className="rounded-2xl border border-line bg-surface p-4">
+            <div key={item.id} className="rounded-card border border-line bg-surface p-4 shadow-card">
               <div className="flex gap-4">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-soft">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-panel bg-surface-soft">
                   {item.image && (
                     <Image src={item.image} alt={item.name} fill sizes="64px" className="object-cover" />
                   )}
@@ -132,7 +106,7 @@ export default async function OrderDetailPage({
           ))}
         </div>
 
-        <div className="h-fit space-y-5 rounded-2xl border border-line bg-surface p-6">
+        <div className="h-fit space-y-5 rounded-card border border-line bg-surface p-6 shadow-card">
           {order.tracking_number && (
             <>
               <div>

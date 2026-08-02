@@ -64,7 +64,7 @@ export function CartDrawer() {
                 <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
                   {lines.map((line) => (
                     <div key={line.productId} className="flex gap-3">
-                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-soft">
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-panel bg-surface-soft">
                         {line.image && (
                           <Image
                             src={line.image}

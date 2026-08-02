@@ -2,17 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Plus, Stethoscope } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Star, Plus, Stethoscope, Heart, Eye } from "lucide-react";
 import type { Product } from "@/types";
-import { formatCurrency, PRODUCT_TYPE_LABELS } from "@/lib/utils";
+import { formatCurrency, PRODUCT_TYPE_LABELS, cn } from "@/lib/utils";
 import { useCart } from "@/store/cart";
+import { useWishlist } from "@/store/wishlist";
+import { useQuickView } from "@/store/quick-view";
+import { scaleIn, withReducedMotion } from "@/lib/motion";
 
 export function ProductCard({ product }: { product: Product }) {
   const addItem = useCart((s) => s.addItem);
-  const open = useCart((s) => s.open);
+  const openCart = useCart((s) => s.open);
+  const toggleWishlist = useWishlist((s) => s.toggle);
+  const inWishlist = useWishlist((s) => s.has(product.id));
+  const openQuickView = useQuickView((s) => s.open);
+  const reduced = !!useReducedMotion();
   const onSale =
-    product.compare_at_price && product.compare_at_price > product.price;
+    !!product.compare_at_price && product.compare_at_price > product.price;
   const outOfStock = product.stock <= 0;
+
+  const gallery: string[] = product.images ? JSON.parse(product.images) : [];
+  const secondImage = gallery.find((img) => img && img !== product.image);
 
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault();
@@ -31,13 +42,34 @@ export function ProductCard({ product }: { product: Product }) {
       },
       1
     );
-    open();
+    openCart();
+  }
+
+  function handleWishlist(e: React.MouseEvent) {
+    e.preventDefault();
+    toggleWishlist({
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      image: product.image,
+      price: product.price,
+      compareAtPrice: product.compare_at_price,
+      brand: product.brand,
+      rating: product.rating,
+      stock: product.stock,
+      requiresPrescription: product.requires_prescription,
+    });
+  }
+
+  function handleQuickView(e: React.MouseEvent) {
+    e.preventDefault();
+    openQuickView(product);
   }
 
   return (
     <Link
       href={`/product/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface transition-shadow hover:shadow-lg hover:shadow-black/5"
+      className="group flex flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card transition-shadow hover:shadow-elevated"
     >
       <div className="relative aspect-square overflow-hidden bg-surface-soft">
         {product.image && (
@@ -46,21 +78,58 @@ export function ProductCard({ product }: { product: Product }) {
             alt={product.name}
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className={cn(
+              "object-cover transition-opacity duration-300",
+              secondImage && "group-hover:opacity-0"
+            )}
           />
         )}
+        {secondImage && (
+          <Image
+            src={secondImage}
+            alt=""
+            fill
+            sizes="(max-width: 768px) 50vw, 25vw"
+            className="object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          />
+        )}
+
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           {onSale && (
-            <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white">
+            <motion.span
+              variants={withReducedMotion(scaleIn, reduced)}
+              initial="hidden"
+              animate="visible"
+              className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-white"
+            >
               SALE
-            </span>
+            </motion.span>
           )}
           {product.requires_prescription === 1 && (
-            <span className="flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[11px] font-semibold text-white">
+            <motion.span
+              variants={withReducedMotion(scaleIn, reduced)}
+              initial="hidden"
+              animate="visible"
+              className="flex items-center gap-1 rounded-full bg-ink/85 px-2.5 py-1 text-[11px] font-semibold text-white"
+            >
               <Stethoscope size={11} /> Rx
-            </span>
+            </motion.span>
           )}
         </div>
+
+        <button
+          onClick={handleWishlist}
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          className={cn(
+            "absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 shadow-card backdrop-blur transition-all duration-200",
+            inWishlist
+              ? "text-accent opacity-100"
+              : "text-ink-soft opacity-0 group-hover:opacity-100"
+          )}
+        >
+          <Heart size={16} className={cn(inWishlist && "fill-accent")} />
+        </button>
+
         {outOfStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-surface/80 backdrop-blur-[1px]">
             <span className="rounded-full bg-ink px-3 py-1 text-xs font-medium text-white">
@@ -68,14 +137,24 @@ export function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         )}
-        <button
-          onClick={handleAdd}
-          disabled={outOfStock}
-          aria-label="Add to cart"
-          className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100 disabled:opacity-0"
-        >
-          <Plus size={18} />
-        </button>
+
+        <div className="absolute bottom-3 right-3 flex items-center gap-2">
+          <button
+            onClick={handleQuickView}
+            aria-label="Quick view"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-ink opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={handleAdd}
+            disabled={outOfStock}
+            aria-label="Add to cart"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100 disabled:opacity-0"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="label-perforation mx-4" />

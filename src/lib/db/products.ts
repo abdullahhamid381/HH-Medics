@@ -187,6 +187,32 @@ export async function listProducts(filters: ProductFilters = {}): Promise<{
   };
 }
 
+export interface BrandSummary {
+  brand: string;
+  count: number;
+}
+
+// Derives a "shop by brand" list straight from the existing products table —
+// no new table or admin surface, just a distinct/count over data that's
+// already there.
+export async function listBrands(limit = 8): Promise<BrandSummary[]> {
+  const { data, error } = await db
+    .from("products")
+    .select("brand")
+    .eq("status", "active")
+    .not("brand", "is", null);
+  if (error) throw new Error(error.message);
+  const counts = new Map<string, number>();
+  for (const row of (data as { brand: string | null }[]) ?? []) {
+    if (!row.brand) continue;
+    counts.set(row.brand, (counts.get(row.brand) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([brand, count]) => ({ brand, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
   const { data, error } = await db
     .from("products")
