@@ -16,16 +16,20 @@ export interface WishlistLine {
 
 interface WishlistState {
   lines: WishlistLine[];
+  isOpen: boolean;
   toggle: (line: WishlistLine) => void;
   remove: (productId: string) => void;
   has: (productId: string) => boolean;
   clear: () => void;
+  open: () => void;
+  close: () => void;
 }
 
 export const useWishlist = create<WishlistState>()(
   persist(
     (set, get) => ({
       lines: [],
+      isOpen: false,
       toggle: (line) => {
         const exists = get().lines.some((l) => l.productId === line.productId);
         set({
@@ -38,7 +42,9 @@ export const useWishlist = create<WishlistState>()(
         set({ lines: get().lines.filter((l) => l.productId !== productId) }),
       has: (productId) => get().lines.some((l) => l.productId === productId),
       clear: () => set({ lines: [] }),
+      open: () => set({ isOpen: true }),
+      close: () => set({ isOpen: false }),
     }),
-    { name: "medistore-wishlist" }
+    { name: "medistore-wishlist", partialize: (state) => ({ lines: state.lines }) }
   )
 );

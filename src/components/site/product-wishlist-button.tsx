@@ -22,6 +22,9 @@ export function ProductWishlistButton({ product }: { product: Product }) {
           price: product.price,
           compareAtPrice: product.compare_at_price,
           rating: product.rating,
+          brand: product.brand,
+          stock: product.stock,
+          requiresPrescription: product.requires_prescription,
         })
       }
       aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
