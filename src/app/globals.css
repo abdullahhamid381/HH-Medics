@@ -1,38 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #F2F3F5;
+  --bg: #F6FAF8;
   --surface: #FFFFFF;
-  --surface-soft: #EDEFF2;
-  --ink: #1D2A38;
-  --ink-soft: #6B7688;
-  --line: #E6E6E6;
-  --primary: #24AEB1;
-  --primary-strong: #177071;
-  --primary-soft: #E1F5F5;
-  --accent: #EB3A7B;
-  --accent-soft: #FCE3EE;
-  --danger: #DC3545;
-  --warning: #D97706;
+  --surface-soft: #EFF7F2;
+  --ink: #0F172A;
+  --ink-soft: #64748B;
+  --line: #E5E7EB;
+  --primary: #059669;
+  --primary-strong: #047857;
+  --primary-soft: #ECFDF5;
+  --secondary: #06B6D4;
+  --secondary-soft: #ECFEFF;
+  --accent: #2563EB;
+  --accent-soft: #EFF6FF;
+  --danger: #E11D48;
+  --warning: #F59E0B;
 
-  --elevation-card: 0 1px 2px rgba(29, 42, 56, 0.04), 0 8px 24px rgba(29, 42, 56, 0.06);
-  --elevation-elevated: 0 4px 12px rgba(29, 42, 56, 0.06), 0 16px 40px rgba(29, 42, 56, 0.10);
+  --elevation-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --elevation-elevated: 0 4px 12px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.10);
 }
 
 .dark {
-  --bg: #0D1A1D;
-  --surface: #142226;
-  --surface-soft: #1B2C31;
-  --ink: #EAF3F3;
-  --ink-soft: #9FB8B8;
-  --line: #26393E;
-  --primary: #4DD8DB;
-  --primary-strong: #7CE8EA;
-  --primary-soft: #143034;
-  --accent: #FF6B9F;
-  --accent-soft: #3A1A26;
-  --danger: #FF6B5C;
-  --warning: #E5A03E;
+  --bg: #09090B;
+  --surface: #18181B;
+  --surface-soft: #27272A;
+  --ink: #FAFAFA;
+  --ink-soft: #A1A1AA;
+  --line: #2E2E33;
+  --primary: #10B981;
+  --primary-strong: #34D399;
+  --primary-soft: #052E22;
+  --secondary: #22D3EE;
+  --secondary-soft: #083344;
+  --accent: #3B82F6;
+  --accent-soft: #172554;
+  --danger: #FB7185;
+  --warning: #FBBF24;
 
   --elevation-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.28);
   --elevation-elevated: 0 4px 16px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.36);
@@ -48,13 +52,15 @@
   --color-primary: var(--primary);
   --color-primary-strong: var(--primary-strong);
   --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-soft: var(--secondary-soft);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --color-warning: var(--warning);
 
-  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --radius-chip: 0.6rem;

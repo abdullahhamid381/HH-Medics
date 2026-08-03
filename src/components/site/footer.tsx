@@ -1,18 +1,9 @@
 import Link from "next/link";
 import { ShieldCheck, Truck, PhoneCall, Sparkles } from "lucide-react";
 import { listPublishedPages } from "@/lib/db/cms";
+import { listCategories } from "@/lib/db/products";
 
 const columns = [
-  {
-    title: "Shop",
-    links: [
-      { label: "Medicines", href: "/shop?category=medicines" },
-      { label: "Supplements", href: "/shop?category=supplements" },
-      { label: "Face Wash", href: "/shop?category=face-wash" },
-      { label: "Serums", href: "/shop?category=serums" },
-      { label: "Cosmetics", href: "/shop?category=cosmetics" },
-    ],
-  },
   {
     title: "Account",
     links: [
@@ -26,8 +17,10 @@ const columns = [
     title: "Support",
     links: [
       { label: "Track an order", href: "/account" },
-      { label: "Shipping info", href: "/shop" },
-      { label: "Contact us", href: "/#contact" },
+      { label: "Shipping info", href: "/pages/shipping-policy" },
+      { label: "Contact us", href: "/contact" },
+      { label: "FAQ", href: "/faq" },
+      { label: "Coupons & offers", href: "/coupons" },
       { label: "Blog", href: "/blog" },
     ],
   },
@@ -42,6 +35,7 @@ const trust = [
 
 export async function Footer() {
   const cmsPages = await listPublishedPages();
+  const categories = await listCategories();
 
   return (
     <footer className="mt-24 border-t border-line bg-surface">
@@ -72,6 +66,23 @@ export async function Footer() {
               labeled, honestly priced, delivered to your door.
             </p>
           </div>
+          {categories.length > 0 && (
+            <div>
+              <p className="font-display text-sm text-ink">Shop</p>
+              <ul className="mt-3 space-y-2.5">
+                {categories.slice(0, 6).map((cat) => (
+                  <li key={cat.id}>
+                    <Link
+                      href={`/shop?category=${cat.slug}`}
+                      className="text-sm text-ink-soft transition hover:text-primary"
+                    >
+                      {cat.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {columns.map((col) => (
             <div key={col.title}>
               <p className="font-display text-sm text-ink">{col.title}</p>

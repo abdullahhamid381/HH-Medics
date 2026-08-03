@@ -61,6 +61,14 @@ export async function markEmailVerified(userId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+  const { error } = await db
+    .from("users")
+    .update({ password_hash: passwordHash, otp_code_hash: null, otp_expires_at: null })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+}
+
 export interface CustomerRow {
   id: string;
   name: string;

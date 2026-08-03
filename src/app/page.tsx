@@ -50,9 +50,15 @@ export default async function HomePage() {
               <LinkButton href="/shop" size="lg">
                 Shop the catalog <ArrowRight size={17} />
               </LinkButton>
-              <LinkButton href="/shop?category=serums" size="lg" variant="outline">
-                Explore skincare
-              </LinkButton>
+              {categories[0] && (
+                <LinkButton
+                  href={`/shop?category=${categories[0].slug}`}
+                  size="lg"
+                  variant="outline"
+                >
+                  Explore {categories[0].name}
+                </LinkButton>
+              )}
             </div>
             <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3">
               <div className="flex items-center gap-2 text-sm text-ink-soft">

@@ -80,7 +80,12 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
             </div>
           </div>
           <div>
-            <Label>Password</Label>
+            <div className="flex items-center justify-between">
+              <Label>Password</Label>
+              <Link href="/forgot-password" className="mb-1.5 text-xs font-medium text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft" />
               <Input
@@ -100,9 +105,8 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
         </form>
       </div>
 
-      <p className="mt-6 rounded-xl bg-surface-soft px-4 py-3 text-xs text-ink-soft">
-        Demo accounts — Admin: admin@medistore.test / Admin@123 · Customer:
-        sara@medistore.test / Demo@123
+      <p className="mt-6 rounded-panel bg-surface-soft px-4 py-3 text-xs text-ink-soft">
+        Admin login — admin@medistore.test / Admin@123
       </p>
 
       <p className="mt-6 text-center text-sm text-ink-soft">

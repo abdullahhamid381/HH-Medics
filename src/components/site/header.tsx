@@ -24,16 +24,12 @@ import { useWishlist } from "@/store/wishlist";
 import { useTheme } from "@/components/providers/theme-provider";
 import { cn } from "@/lib/utils";
 import { scaleIn, withReducedMotion } from "@/lib/motion";
+import type { Category } from "@/types";
 
-const NAV_LINKS = [
-  { label: "Medicines", href: "/shop?category=medicines" },
-  { label: "Supplements", href: "/shop?category=supplements" },
-  { label: "Face Wash", href: "/shop?category=face-wash" },
-  { label: "Serums", href: "/shop?category=serums" },
-  { label: "Cosmetics", href: "/shop?category=cosmetics" },
-];
-
-export function Header() {
+export function Header({ categories }: { categories: Category[] }) {
+  const navLinks = categories
+    .slice(0, 6)
+    .map((c) => ({ label: c.name, href: `/shop?category=${c.slug}` }));
   const { data: session } = useSession();
   const { theme, toggle } = useTheme();
   const lines = useCart((s) => s.lines);
@@ -96,7 +92,7 @@ export function Header() {
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -283,7 +279,7 @@ export function Header() {
                     </span>
                   )}
                 </Link>
-                {NAV_LINKS.map((link) => (
+                {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
